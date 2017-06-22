@@ -1,20 +1,27 @@
 (ns tetris.core
-  (:require [clojure.string :as s]))
+  (:require [clojure.string :as s]
+            [lanterna.screen :as console]))
 
 ;; -------------------------------------------------------------------------------------------
 ;; ----------------------------------------- GLOBALS -----------------------------------------
 ;; -------------------------------------------------------------------------------------------
 
+;; The window that will hold our game.
+(def display (console/get-screen :swing {:rows 22 :cols 20}))
+
 ;; The player's score.
 (def SCORE (atom 0))
 (def CLEARED-LINES (atom 0))
+
+(def GAME-SPEED (atom 600))
+(def MAX-SPEED 100)
 
 ;; Our playfield.
 (def MATRIX (atom []))
 
 ;; The active tetris piece that the player moves.
 ;; Possible rotations: CENTER, ROTATE1, ROTATE2, ROTATE3
-(def ACTIVE-PIECE (atom {:id "" :rotation :CENTER :row 0 :col 0 :graphics []}))
+(def ACTIVE-PIECE (atom {:id "" :rotation :CENTER :row 0 :col 0 :anchored false :graphics []}))
 
 ;; All possible tetris pieces and their spawning locations.
 (def START-POSITIONS
@@ -125,17 +132,25 @@
 ;; ------------------------------------ Create playfield -------------------------------------
 ;; -------------------------------------------------------------------------------------------
 
+(defn print-line!
+  "A custom printing function for our swing console."
+  [text lnum]
+  (console/put-string display 0 lnum text))
+
+(defn clear-screen!
+  "Clear the console window."
+  []
+  (console/redraw display))
+
 (defn get-empty-matrix []
   (into [] (take 22 (repeat EMPTY-LINE))))
 
 (defn print-matrix! [matrix]
   (flush)
   (if (empty? matrix) (recur (get-empty-matrix))
-    (println (s/join "\n" (map #(s/join " " %) matrix)))))
-
-(defn read-matrix! []
-  (into []
-        (take 22 (repeatedly #(s/split (read-line) #" ")))))
+    (let [lines (map #(s/join " " %) matrix)]
+      (doseq [[line i] (map list lines (range (count lines)))]
+        (print-line! line i)))))
 
 (defn clear-matrix! []
   (swap! MATRIX (fn [m] (get-empty-matrix))))
@@ -162,6 +177,7 @@
               :rotation rotation
               :row row
               :col col
+              :anchored false
               :graphics (get-graphics id rotation)}))))
 
 (defn clean-rows
@@ -231,39 +247,26 @@
 ;; ------------------------------------ Collision handling -----------------------------------
 ;; -------------------------------------------------------------------------------------------
 
-(defn get-bottom-collisions
+(defn get-collisions
   "Detects all bottom collision on a single piece row."
   [piece-row move-row]
   (map #(and (not= "." %1) (not= "." %2)) piece-row move-row))
-
-(defn get-side-collision
-  "Returns true if there is a side collision for a single row."
-  [piece-row move-row piece-col move-col]
-  (and (not= "." (get piece-row piece-col)) (not= "." (get move-row move-col))))
-
-(defn get-side-collisions
-  "Returns a seq of true/false for every side collision of the current piece at the coords the player is trying to move."
-  [piece-rows move-rows piece-col move-col]
-  (map #(get-side-collision %1 %2 piece-col move-col) piece-rows move-rows))
 
 (defn count-collisions
   [collision-vector]
   (count (filter #(.contains % true) collision-vector)))
 
-(defn detect-collisions
+(defn detect-collision
   "Returns true if the active tetris piece will collide with anything in the matrix at the given coordinates."
   [move-row move-col rotation-graphics]
   (let [piece-height (count (clean-piece rotation-graphics))
-        piece-row (:row @ACTIVE-PIECE)
-        piece-col (:col @ACTIVE-PIECE)
-        portrait (insert-piece rotation-graphics (get-empty-matrix) piece-row piece-col)
-        piece-slice (subvec portrait piece-row (+ piece-row piece-height))
+        portrait (insert-piece rotation-graphics (get-empty-matrix) move-row move-col)
+        piece-slice (subvec portrait move-row (+ move-row piece-height))
         move-slice (subvec @MATRIX move-row (+ move-row piece-height))
-        bottom-collisions (map #(get-bottom-collisions %1 %2) piece-slice move-slice)]
-    (cond
-      (> (count-collisions bottom-collisions) 0) :bottom-collison
-      (> (count-collisions [(get-side-collisions piece-slice move-slice piece-col move-col)]) 0) :side-collison
-      :else :no-collision)))
+        collisions (map #(get-collisions %1 %2) piece-slice move-slice)]
+    (if
+      (> (count-collisions collisions) 0) :collision
+      :no-collision)))
 
 ;; -------------------------------------------------------------------------------------------
 ;; ------------------------------------ Rotation handling ------------------------------------
@@ -289,7 +292,7 @@
         current-col (:col @ACTIVE-PIECE)
         new-rotation (get-graphics current-id rotation)]
     (if (and (= :in-bounds (check-bounds current-row current-col new-rotation @MATRIX))
-             (= :no-collision (detect-collisions current-row current-col new-rotation)))
+             (= :no-collision (detect-collision current-row current-col new-rotation)))
       (swap!
         ACTIVE-PIECE
         (fn [p]
@@ -297,6 +300,7 @@
            :rotation rotation
            :row current-row
            :col current-col
+           :anchored false
            :graphics new-rotation}))
       :cant-rotate)))
 
@@ -323,7 +327,8 @@
 (defn update-playfield! []
   (swap! MATRIX
          #(downcase-matrix
-            (insert-piece (:graphics @ACTIVE-PIECE) % (:row @ACTIVE-PIECE) (:col @ACTIVE-PIECE)))))
+            (insert-piece (:graphics @ACTIVE-PIECE) % (:row @ACTIVE-PIECE) (:col @ACTIVE-PIECE))))
+  (swap! ACTIVE-PIECE #(assoc % :anchored true)))
 
 (defn move-active-piece! [& {:keys [x y]
                              :or {x (:row @ACTIVE-PIECE)
@@ -339,7 +344,7 @@
         new-y (dec (:col @ACTIVE-PIECE))]
     (cond
       (not= :in-bounds (check-bounds new-x new-y (:graphics @ACTIVE-PIECE) @MATRIX)) :out-of-bouns
-      (= :side-collison (detect-collisions new-x new-y (:graphics @ACTIVE-PIECE))) :cant-move-there
+      (= :collision (detect-collision new-x new-y (:graphics @ACTIVE-PIECE))) :cant-move-there
       :else (move-active-piece! :x new-x :y new-y))))
 
 (defn move-right!
@@ -349,7 +354,7 @@
         new-y (inc (:col @ACTIVE-PIECE))]
     (cond
       (not= :in-bounds (check-bounds new-x new-y (:graphics @ACTIVE-PIECE) @MATRIX)) :out-of-bouns
-      (= :side-collison (detect-collisions new-x new-y (:graphics @ACTIVE-PIECE))) :cant-move-there
+      (= :collision (detect-collision new-x new-y (:graphics @ACTIVE-PIECE))) :cant-move-there
       :else (move-active-piece! :x new-x :y new-y))))
 
 (defn move-down!
@@ -359,20 +364,16 @@
         new-y (:col @ACTIVE-PIECE)]
     (cond
       (not= :in-bounds (check-bounds new-x new-y (:graphics @ACTIVE-PIECE) @MATRIX)) (update-playfield!)
-      (= :bottom-collison (detect-collisions new-x new-y (:graphics @ACTIVE-PIECE))) (update-playfield!)
+      (= :collision (detect-collision new-x new-y (:graphics @ACTIVE-PIECE))) (update-playfield!)
       :else (move-active-piece! :x new-x :y new-y))))
-
-(defn hard-drop!
-  "Drops the current tetris piece all the way to the bottom.
-  Since this operation cannot be undone, the playfield is left permanently changed."
-  []
-  (dotimes [i (count @MATRIX)]
-    (move-down!))
-  (update-playfield!))
 
 ;; -------------------------------------------------------------------------------------------
 ;; ---------------------------------------- Game loop ----------------------------------------
 ;; -------------------------------------------------------------------------------------------
+
+(defn choose-new-piece! []
+  (let [new-piece (first (shuffle ["I" "O" "Z" "S" "J" "L" "T"]))]
+    (set-active-piece! new-piece)))
 
 (defn get-filled-lines
   "Returns any lines with no empty spaces in them."
@@ -383,15 +384,34 @@
   "Well, if the player has filled any lines, we have to unfill them."
   [matrix]
   (let [num-cleared-lines (count (get-filled-lines @MATRIX))
-        matrix-cleared (remove #(not (.contains % ".")) matrix)]
-    (concat
-      (take num-cleared-lines (repeat EMPTY-LINE))
-      matrix-cleared)))
+        matrix-cleared (into [] (remove #(not (.contains % ".")) matrix))]
+    (into []
+          (concat
+            (take num-cleared-lines (repeat EMPTY-LINE))
+            matrix-cleared))))
 
 (defn game-over?
   "Returns true if the player has reached the top level of the matrix, thus losing the game."
   []
   (some #(not= "." %) (first @MATRIX)))
+
+(defn quit-game! []
+  (console/stop display))
+
+(defn game-over!
+  "Shows the game over message and exits when the player presses ESC key."
+  []
+  (print-line! "**** GAME OVER ****" 0)
+  (print-line! (str "SCORE - " @SCORE) 1)
+  (clear-screen!)
+  (let [input-key (console/get-key-blocking display)]
+    (if (= :escape input-key) (quit-game!)
+      (recur))))
+
+(defn increase-difficulty!
+  []
+  (when (> @GAME-SPEED MAX-SPEED)
+    (swap! GAME-SPEED #(- % 1))))
 
 (defn step!
   "Perform the next step in the game (if the player cleared a line, count the score and stuff)"
@@ -402,43 +422,37 @@
       (swap! CLEARED-LINES #(+ num-cleared-lines %))
       (swap! SCORE #(+ (* 100 num-cleared-lines) %)))))
 
-(defn clear-screen!
-  "Clear the console window."
-  []
-  (-> (new ProcessBuilder (list "cmd" "/c" "cls")) (.inheritIO) (.start) (.waitFor)))
+(defn read-input []
+  (let [user-input (console/get-key display)]
+    (cond
+      (= :left user-input) (move-left!)
+      (= :right user-input) (move-right!)
+      (= :down user-input) (move-down!)
+      (= :escape user-input) (quit-game!)
+      (= \z user-input) (rotate-left!)
+      (= \x user-input) (rotate-right!))))
 
-(defn do-command! [command-str]
-  (cond
-    (.contains command-str " ") (doseq [command (s/split command-str #" ")]
-                                  (do-command! command))
-    (= "q" command-str) (System/exit 0)
-    (= "p" command-str) (print-matrix! @MATRIX)
-    (= "P" command-str) (print-matrix!
-                         (insert-piece (:graphics @ACTIVE-PIECE) @MATRIX (:row @ACTIVE-PIECE) (:col @ACTIVE-PIECE)))
-    (= "g" command-str) (swap! MATRIX (fn [m] (read-matrix!)))
-    (= "c" command-str) (clear-matrix!)
-    (= "C" command-str) (clear-screen!)
-    (= "?s" command-str) (println @SCORE)
-    (= "?n" command-str) (println @CLEARED-LINES)
-    (= ";" command-str) (print "\n")
-    (= "s" command-str) (step!)
-    (= "I" command-str) (set-active-piece! "I")
-    (= "O" command-str) (set-active-piece! "O")
-    (= "Z" command-str) (set-active-piece! "Z")
-    (= "S" command-str) (set-active-piece! "S")
-    (= "J" command-str) (set-active-piece! "J")
-    (= "L" command-str) (set-active-piece! "L")
-    (= "T" command-str) (set-active-piece! "T")
-    (= "t" command-str) (print-matrix! (:graphics @ACTIVE-PIECE))
-    (= ")" command-str) (rotate-right!)
-    (= "(" command-str) (rotate-left!)
-    (= "<" command-str) (move-left!)
-    (= ">" command-str) (move-right!)
-    (= "v" command-str) (move-down!)
-    (= "V" command-str) (hard-drop!)
-    :else (doseq [command (s/split command-str #"")] (do-command! command))))
+(defn game-loop []
+  (when (or (= "" (:id @ACTIVE-PIECE))
+            (= true (:anchored @ACTIVE-PIECE)))
+    (choose-new-piece!))
+  (step!)
+  (clear-screen!)
+  (print-matrix!
+    (insert-piece (:graphics @ACTIVE-PIECE) @MATRIX (:row @ACTIVE-PIECE) (:col @ACTIVE-PIECE)))
+  (read-input)
+  (if (game-over?)
+    (game-over!)
+    (recur)))
 
 (defn -main []
-  (let [command (read-line)]
-    (do-command! command))
-  (recur))
+  (clear-matrix!)
+  (console/start display)
+  ;; The game gets harder every 60 seconds.
+  (future
+    (while true
+      (do
+        (increase-difficulty!) ;; Increase the difficulty slowly as the game progresses.
+        (Thread/sleep @GAME-SPEED)
+        (move-down!))))
+  (game-loop))
