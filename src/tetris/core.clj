@@ -1,6 +1,7 @@
 (ns tetris.core
   (:require [clojure.string :as s]
-            [lanterna.screen :as console]))
+            [lanterna.screen :as console])
+  (:gen-class))
 
 ;; -------------------------------------------------------------------------------------------
 ;; ----------------------------------------- GLOBALS -----------------------------------------
@@ -448,7 +449,6 @@
 (defn -main []
   (clear-matrix!)
   (console/start display)
-  ;; The game gets harder every 60 seconds.
   (future
     (while true
       (do
