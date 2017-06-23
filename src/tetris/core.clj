@@ -144,7 +144,8 @@
   "Contract: nil -> nil
   Clear the console window."
   []
-  (console/redraw DISPLAY))
+  (console/redraw DISPLAY)
+  (Thread/sleep 30)) ;; We need a slight delay when redrawing or it will consume too much CPU.
 
 (defn get-empty-matrix
   "Contract: nil -> vector<vector>"
@@ -280,7 +281,7 @@
 (defn count-collisions
   "Contract: vector<bool> -> int"
   [collision-vector]
-  (count (filter #(.contains % true) collision-vector)))
+  (count (filter #(some #{true} %) collision-vector)))
 
 (defn detect-collision
   "Contract: int int vector<vector> -> keyword
@@ -421,14 +422,14 @@
   "Contract: vector<vector> -> vector<vector>
   Returns any lines with no empty spaces in them."
   [matrix]
-  (filter #(not (.contains % ".")) matrix))
+  (filter #(not (some #{"."} %)) matrix))
 
 (defn clear-filled-lines
   "Contract: vector<vector> -> vector<vector>
   Well, if the player has filled any lines, we have to unfill them."
   [matrix]
   (let [num-cleared-lines (count (get-filled-lines @MATRIX))
-        matrix-cleared (into [] (remove #(not (.contains % ".")) matrix))]
+        matrix-cleared (into [] (remove #(not (some #{"."} %)) matrix))]
     (into []
           (concat
             (take num-cleared-lines (repeat EMPTY-LINE))
