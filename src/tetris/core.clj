@@ -1,6 +1,8 @@
 (ns tetris.core
   (:require [clojure.string :as s]
-            [lanterna.screen :as console])
+            [lanterna.screen :as console]
+            [lanterna.terminal :as t])
+  (:import com.googlecode.lanterna.screen.Screen)
   (:gen-class))
 
 ;; -------------------------------------------------------------------------------------------
@@ -8,13 +10,15 @@
 ;; -------------------------------------------------------------------------------------------
 
 ;; The window that will hold our game.
-(def DISPLAY (console/get-screen :swing {:rows 22 :cols 20}))
-(def HIGH-SCORE-FILE "./score.dat")
+(def WINDOW (t/get-terminal :swing {:rows 22 :cols 20}))
+(def DISPLAY (new Screen WINDOW))
 
 ;; The player's score.
 (def SCORE (atom 0))
 (def CLEARED-LINES (atom 0))
+(def HIGH-SCORE-FILE "./score.dat")
 
+;; The speed which controls the game's difficulty.
 (def GAME-SPEED (atom 600))
 (def MAX-SPEED 100)
 
@@ -471,7 +475,7 @@
   []
   (overwrite-high-score!)
   (print-line! "**** GAME OVER ****" 0)
-  (print-line! (str "SCORE - " @SCORE) 1)
+  (print-line! (str "YOUR SCORE - " @SCORE) 1)
   (print-line! (str "HIGH SCORE - " (read-high-score HIGH-SCORE-FILE)) 2)
   (clear-screen!)
   (let [input-key (console/get-key-blocking DISPLAY)]
@@ -533,6 +537,8 @@
 
 (defn -main []
   (console/start DISPLAY)
+  ;; Center the main window before showing the title screen.
+  (-> WINDOW (.getJFrame) (.setLocationRelativeTo nil))
   (show-title-screen!)
   (clear-matrix!)
   (future
