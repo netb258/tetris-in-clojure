@@ -8,7 +8,8 @@
 ;; -------------------------------------------------------------------------------------------
 
 ;; The window that will hold our game.
-(def display (console/get-screen :swing {:rows 22 :cols 20}))
+(def DISPLAY (console/get-screen :swing {:rows 22 :cols 20}))
+(def HIGH-SCORE-FILE "./score.dat")
 
 ;; The player's score.
 (def SCORE (atom 0))
@@ -136,12 +137,12 @@
 (defn print-line!
   "A custom printing function for our swing console."
   [text lnum]
-  (console/put-string display 0 lnum text))
+  (console/put-string DISPLAY 0 lnum text))
 
 (defn clear-screen!
   "Clear the console window."
   []
-  (console/redraw display))
+  (console/redraw DISPLAY))
 
 (defn get-empty-matrix []
   (into [] (take 22 (repeat EMPTY-LINE))))
@@ -397,15 +398,32 @@
   (some #(not= "." %) (first @MATRIX)))
 
 (defn quit-game! []
-  (console/stop display))
+  (System/exit 0))
+
+(defn read-high-score
+  "Reads the players best score from a file"
+  [fname]
+  (read-string (slurp fname)))
+
+(defn save-high-score
+  "Saves the players score to a file."
+  [fname]
+  (spit fname (with-out-str (pr @SCORE))))
+
+(defn overwrite-high-score! []
+  (let [high-score (read-high-score HIGH-SCORE-FILE)]
+    (when (> @SCORE high-score)
+      (save-high-score HIGH-SCORE-FILE))))
 
 (defn game-over!
   "Shows the game over message and exits when the player presses ESC key."
   []
+  (overwrite-high-score!)
   (print-line! "**** GAME OVER ****" 0)
   (print-line! (str "SCORE - " @SCORE) 1)
+  (print-line! (str "HIGH SCORE - " (read-high-score HIGH-SCORE-FILE)) 2)
   (clear-screen!)
-  (let [input-key (console/get-key-blocking display)]
+  (let [input-key (console/get-key-blocking DISPLAY)]
     (if (= :escape input-key) (quit-game!)
       (recur))))
 
@@ -424,7 +442,7 @@
       (swap! SCORE #(+ (* 100 num-cleared-lines) %)))))
 
 (defn read-input []
-  (let [user-input (console/get-key display)]
+  (let [user-input (console/get-key DISPLAY)]
     (cond
       (= :left user-input) (move-left!)
       (= :right user-input) (move-right!)
@@ -440,15 +458,21 @@
   (step!)
   (clear-screen!)
   (print-matrix!
-    (insert-piece (:graphics @ACTIVE-PIECE) @MATRIX (:row @ACTIVE-PIECE) (:col @ACTIVE-PIECE)))
+    (insert-piece
+      (:graphics @ACTIVE-PIECE) @MATRIX (:row @ACTIVE-PIECE) (:col @ACTIVE-PIECE)))
   (read-input)
   (if (game-over?)
     (game-over!)
     (recur)))
 
 (defn -main []
+  (console/start DISPLAY)
+  (print-line! "***** TETRIS *****" 0)
+  (print-line! "PRESS ANY KEY: PLAY" 1)
+  (print-line! "PRESS ESC: QUIT" 2)
+  (clear-screen!)
+  (console/get-key-blocking DISPLAY)
   (clear-matrix!)
-  (console/start display)
   (future
     (while true
       (do
