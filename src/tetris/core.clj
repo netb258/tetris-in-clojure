@@ -465,13 +465,16 @@
     (game-over!)
     (recur)))
 
-(defn -main []
-  (console/start DISPLAY)
+(defn show-title-screen! []
   (print-line! "***** TETRIS *****" 0)
   (print-line! "PRESS ANY KEY: PLAY" 1)
   (print-line! "PRESS ESC: QUIT" 2)
   (clear-screen!)
-  (console/get-key-blocking DISPLAY)
+  (console/get-key-blocking DISPLAY))
+
+(defn -main []
+  (console/start DISPLAY)
+  (show-title-screen!)
   (clear-matrix!)
   (future
     (while true
