@@ -135,26 +135,34 @@
 ;; -------------------------------------------------------------------------------------------
 
 (defn print-line!
-  "A custom printing function for our swing console."
+  "Contract: string int -> nil
+  A custom printing function for our swing console."
   [text lnum]
   (console/put-string DISPLAY 0 lnum text))
 
 (defn clear-screen!
-  "Clear the console window."
+  "Contract: nil -> nil
+  Clear the console window."
   []
   (console/redraw DISPLAY))
 
-(defn get-empty-matrix []
+(defn get-empty-matrix
+  "Contract: nil -> vector<vector>"
+  []
   (into [] (take 22 (repeat EMPTY-LINE))))
 
-(defn print-matrix! [matrix]
+(defn print-matrix!
+  "Contract: vector<vector> -> nil"
+  [matrix]
   (flush)
   (if (empty? matrix) (recur (get-empty-matrix))
     (let [lines (map #(s/join " " %) matrix)]
       (doseq [[line i] (map list lines (range (count lines)))]
         (print-line! line i)))))
 
-(defn clear-matrix! []
+(defn clear-matrix!
+  "Contract: nil -> nil"
+  []
   (swap! MATRIX (fn [m] (get-empty-matrix))))
 
 ;; -------------------------------------------------------------------------------------------
@@ -162,6 +170,7 @@
 ;; -------------------------------------------------------------------------------------------
 
 (defn get-graphics
+  "Contract: string keyword -> vector<vector>"
   [piece-id rotation]
   (cond
     (= :CENTER rotation) (get PIECES-NORMAL piece-id)
@@ -172,7 +181,7 @@
 (defn set-active-piece!
   ([id] (set-active-piece! id :CENTER (START-POSITIONS id)))
   ([id [row col]] (set-active-piece! id (:rotation @ACTIVE-PIECE) [row col]))
-  ([id rotation [row col]]
+  ([id rotation [row col]] ;; Contract: string keyword [int int] -> nil
    (swap!
      ACTIVE-PIECE
      (fn [p] {:id id
@@ -183,18 +192,21 @@
               :graphics (get-graphics id rotation)}))))
 
 (defn clean-rows
-  "Removes from the piece any rows that contain only empty spaces."
+  "Contract: vector<vector> -> vector<vector>
+  Removes from the piece any rows that contain only empty spaces."
   [piece-graphics]
   (let [top-empty-rows (take-while (fn [row] (every? #(= "." %) row)) piece-graphics)
         full-rows (filter (fn [row] (some #(not= "." %) row)) piece-graphics)]
     (into [] (concat top-empty-rows full-rows))))
 
 (defn flip-row
-  "Selects a single row from a piece graphics from rows to cols representation."
+  "Contract: vector<vector> int -> vector<string>
+  Selects a single row from a piece graphics and transforms it from rows to cols representation."
   [piece-graphics col]
   (into [] (map #(nth % col) piece-graphics)))
 
 (defn flip-all-rows
+  "Contract: vector<vector> -> vector<vector>"
   [piece-graphics]
   (vec
     (for [i (range (count (first piece-graphics)))
@@ -203,7 +215,8 @@
 
 ;; NOTE: Calling flip-all-rows twice, basically flips the rows/cols representation back into it's original form.
 (defn clean-cols
-  "Removes from the piece any cols that contain only empty spaces."
+  "Contract: vector<vector> -> vector<vector>
+  Removes from the piece any cols that contain only empty spaces."
   [piece-graphics]
   (flip-all-rows
     (filter
@@ -211,11 +224,14 @@
       (flip-all-rows piece-graphics))))
 
 (defn clean-piece
-  "Removes any empty rows and cols from a piece."
+  "Contract: vector<vector> -> vector<vector>
+  Removes any empty rows and cols from a piece."
   [piece-graphics]
   (clean-cols (clean-rows piece-graphics)))
 
-(defn insert-piece-row [piece-row matrix-row position]
+(defn insert-piece-row
+  "Contract: vector<string> vector<string> int -> vector<string>"
+  [piece-row matrix-row position]
   (let [row-size (count matrix-row)
         end-position (+ position (count piece-row))
         leading-space (take-while #(= "." %) piece-row)
@@ -227,15 +243,21 @@
           (concat
             before-piece piece after-piece))))
 
-(defn upcase-matrix [matrix]
+(defn upcase-matrix
+  "Contract: vector<vector> -> vector<vector>"
+  [matrix]
   (mapv #(mapv s/upper-case %) matrix))
 
-(defn downcase-matrix [matrix]
+(defn downcase-matrix
+  "Contract: vector<vector> -> vector<vector>"
+  [matrix]
   (mapv #(mapv s/lower-case %) matrix))
 
 ;; Throws an IndexOutOfBoundsException, if the row/col are outside the matrix.
 ;; NOTE: (map #(map s/upper-case %) piece) - Need the double map, since the piece is represented as a vector of vectors.
-(defn insert-piece [piece matrix row col]
+(defn insert-piece
+  "Contract: vector<vector> vector<vector> int int -> vector<vector>"
+  [piece matrix row col]
   (let [piece (clean-piece piece)
         num-piece-rows (count piece)
         rows-before-piece (subvec matrix 0 row)
@@ -250,16 +272,19 @@
 ;; -------------------------------------------------------------------------------------------
 
 (defn get-collisions
-  "Detects all bottom collision on a single piece row."
+  "Contract: vector<string> vector<string> -> vector<bool>
+  Detects collisions on a single piece row."
   [piece-row move-row]
   (map #(and (not= "." %1) (not= "." %2)) piece-row move-row))
 
 (defn count-collisions
+  "Contract: vector<bool> -> int"
   [collision-vector]
   (count (filter #(.contains % true) collision-vector)))
 
 (defn detect-collision
-  "Returns true if the active tetris piece will collide with anything in the matrix at the given coordinates."
+  "Contract: int int vector<vector> -> keyword
+  Returns :collision if the active tetris piece will collide with anything in the matrix at the given coordinates."
   [move-row move-col rotation-graphics]
   (let [piece-height (count (clean-piece rotation-graphics))
         portrait (insert-piece rotation-graphics (get-empty-matrix) move-row move-col)
@@ -275,7 +300,8 @@
 ;; -------------------------------------------------------------------------------------------
 
 (defn check-bounds
-  "Takes the row and col of where the player is trying to move and checks if they are within the matrix."
+  "Contract: int int vector<vector> vector<vector> -> keyword
+  Takes the row and col of where the player is trying to move and checks if they are within the matrix."
   [move-x move-y piece-graphics matrix]
   (let [piece-cleaned (clean-piece piece-graphics)
         piece-width (count (last (sort-by count piece-cleaned)))
@@ -288,7 +314,9 @@
       (> move-x x-limit) :bottom-collison
       :else :in-bounds)))
 
-(defn rotate-piece! [rotation]
+(defn rotate-piece!
+  "Contract: keyword -> nil"
+  [rotation]
   (let [current-id (:id @ACTIVE-PIECE)
         current-row (:row @ACTIVE-PIECE)
         current-col (:col @ACTIVE-PIECE)
@@ -306,7 +334,9 @@
            :graphics new-rotation}))
       :cant-rotate)))
 
-(defn rotate-left! []
+(defn rotate-left!
+  "Contract: nil -> nil"
+  []
   (let [current-rotation (:rotation @ACTIVE-PIECE)]
    (cond
      (= :CENTER current-rotation) (rotate-piece! :ROTATE3)
@@ -314,7 +344,9 @@
      (= :ROTATE2 current-rotation) (rotate-piece! :ROTATE1)
      :else (rotate-piece! :CENTER))))
 
-(defn rotate-right! []
+(defn rotate-right!
+  "Contract: nil -> nil"
+  []
   (let [current-rotation (:rotation @ACTIVE-PIECE)]
     (cond
       (= :CENTER current-rotation) (rotate-piece! :ROTATE1)
@@ -326,21 +358,26 @@
 ;; ------------------------------------ Move tetris piece ------------------------------------
 ;; -------------------------------------------------------------------------------------------
 
-(defn update-playfield! []
+(defn update-playfield!
+  "Contract: nil -> nil"
+  []
   (swap! MATRIX
          #(downcase-matrix
             (insert-piece (:graphics @ACTIVE-PIECE) % (:row @ACTIVE-PIECE) (:col @ACTIVE-PIECE))))
   (swap! ACTIVE-PIECE #(assoc % :anchored true)))
 
-(defn move-active-piece! [& {:keys [x y]
-                             :or {x (:row @ACTIVE-PIECE)
-                                  y (:col @ACTIVE-PIECE)}}]
+(defn move-active-piece!
+  "Contract: int int -> nil or error keyword"
+  [& {:keys [x y]
+      :or {x (:row @ACTIVE-PIECE)
+           y (:col @ACTIVE-PIECE)}}]
   (if (= :in-bounds (check-bounds x y (:graphics @ACTIVE-PIECE) @MATRIX))
     (set-active-piece! (:id @ACTIVE-PIECE) [x y])
     :out-of-bounds))
 
 (defn move-left!
-  "Allows the player to move the current active piece to the left."
+  "Contract: nil -> nil or error keyword
+  Allows the player to move the current active piece to the left."
   []
   (let [new-x (:row @ACTIVE-PIECE)
         new-y (dec (:col @ACTIVE-PIECE))]
@@ -350,7 +387,8 @@
       :else (move-active-piece! :x new-x :y new-y))))
 
 (defn move-right!
-  "Allows the player to move the current active piece to the right."
+  "Contract: nil -> nil or error keyword
+  Allows the player to move the current active piece to the right."
   []
   (let [new-x (:row @ACTIVE-PIECE)
         new-y (inc (:col @ACTIVE-PIECE))]
@@ -373,17 +411,21 @@
 ;; ---------------------------------------- Game loop ----------------------------------------
 ;; -------------------------------------------------------------------------------------------
 
-(defn choose-new-piece! []
+(defn choose-new-piece!
+  "Contract: nil -> string"
+  []
   (let [new-piece (first (shuffle ["I" "O" "Z" "S" "J" "L" "T"]))]
     (set-active-piece! new-piece)))
 
 (defn get-filled-lines
-  "Returns any lines with no empty spaces in them."
+  "Contract: vector<vector> -> vector<vector>
+  Returns any lines with no empty spaces in them."
   [matrix]
   (filter #(not (.contains % ".")) matrix))
 
 (defn clear-filled-lines
-  "Well, if the player has filled any lines, we have to unfill them."
+  "Contract: vector<vector> -> vector<vector>
+  Well, if the player has filled any lines, we have to unfill them."
   [matrix]
   (let [num-cleared-lines (count (get-filled-lines @MATRIX))
         matrix-cleared (into [] (remove #(not (.contains % ".")) matrix))]
@@ -393,30 +435,38 @@
             matrix-cleared))))
 
 (defn game-over?
-  "Returns true if the player has reached the top level of the matrix, thus losing the game."
+  "Contract: nil -> bool
+  Returns true if the player has reached the top level of the matrix, thus losing the game."
   []
   (some #(not= "." %) (first @MATRIX)))
 
-(defn quit-game! []
+(defn quit-game!
+  "Contract: nil -> nil"
+  []
   (System/exit 0))
 
 (defn read-high-score
-  "Reads the players best score from a file"
+  "Contract: string -> int
+  Reads the players best score from a file"
   [fname]
   (read-string (slurp fname)))
 
 (defn save-high-score
-  "Saves the players score to a file."
+  "Contract: string -> int
+  Saves the players score to a file."
   [fname]
   (spit fname (with-out-str (pr @SCORE))))
 
-(defn overwrite-high-score! []
+(defn overwrite-high-score!
+  "Contract: nil -> nil"
+  []
   (let [high-score (read-high-score HIGH-SCORE-FILE)]
     (when (> @SCORE high-score)
       (save-high-score HIGH-SCORE-FILE))))
 
 (defn game-over!
-  "Shows the game over message and exits when the player presses ESC key."
+  "Contract: nil -> nil
+  Shows the game over message and exits when the player presses ESC key."
   []
   (overwrite-high-score!)
   (print-line! "**** GAME OVER ****" 0)
@@ -428,12 +478,14 @@
       (recur))))
 
 (defn increase-difficulty!
+  "Contract: nil -> nil"
   []
   (when (> @GAME-SPEED MAX-SPEED)
     (swap! GAME-SPEED #(- % 1))))
 
 (defn step!
-  "Perform the next step in the game (if the player cleared a line, count the score and stuff)"
+  "Contract: nil -> nil
+  Perform the next step in the game (if the player cleared a line, count the score and stuff)"
   []
   (let [num-cleared-lines (count (get-filled-lines @MATRIX))]
     (when (> num-cleared-lines 0)
@@ -441,7 +493,9 @@
       (swap! CLEARED-LINES #(+ num-cleared-lines %))
       (swap! SCORE #(+ (* 100 num-cleared-lines) %)))))
 
-(defn read-input []
+(defn read-input
+  "Contract: nil -> nil"
+  []
   (let [user-input (console/get-key DISPLAY)]
     (cond
       (= :left user-input) (move-left!)
@@ -451,7 +505,9 @@
       (= \z user-input) (rotate-left!)
       (= \x user-input) (rotate-right!))))
 
-(defn game-loop []
+(defn game-loop
+  "Contract: nil -> nil"
+  []
   (when (or (= "" (:id @ACTIVE-PIECE))
             (= true (:anchored @ACTIVE-PIECE)))
     (choose-new-piece!))
@@ -465,7 +521,9 @@
     (game-over!)
     (recur)))
 
-(defn show-title-screen! []
+(defn show-title-screen!
+  "Contract: nil -> char"
+  []
   (print-line! "***** TETRIS *****" 0)
   (print-line! "PRESS ANY KEY: PLAY" 1)
   (print-line! "PRESS ESC: QUIT" 2)
