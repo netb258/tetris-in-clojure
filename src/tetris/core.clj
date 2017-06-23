@@ -532,6 +532,9 @@
   (print-line! "***** TETRIS *****" 0)
   (print-line! "PRESS ANY KEY: PLAY" 1)
   (print-line! "PRESS ESC: QUIT" 2)
+  (print-line! "AROW KEYS: MOVE" 3)
+  (print-line! "PRESS Z: ROTATE L" 4)
+  (print-line! "PRESS X: ROTATE R" 5)
   (clear-screen!)
   (console/get-key-blocking DISPLAY))
 
