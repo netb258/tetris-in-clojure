@@ -539,6 +539,7 @@
   (console/get-key-blocking DISPLAY))
 
 (defn -main []
+  (println "Done!") ;; Signal that we have loaded the program.
   (console/start DISPLAY)
   ;; Center the main window before showing the title screen.
   (-> WINDOW (.getJFrame) (.setLocationRelativeTo nil))
