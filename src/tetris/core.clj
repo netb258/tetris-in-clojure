@@ -10,7 +10,7 @@
 ;; -------------------------------------------------------------------------------------------
 
 ;; The window that will hold our game.
-(def WINDOW (t/get-terminal :swing {:rows 22 :cols 20}))
+(def WINDOW (t/get-terminal :swing {:rows 22 :cols 19 :font-size 20}))
 (def DISPLAY (new Screen WINDOW))
 
 ;; The player's score.
@@ -18,9 +18,9 @@
 (def CLEARED-LINES (atom 0))
 (def HIGH-SCORE-FILE "./score.dat")
 
-;; The speed which controls the game's difficulty.
-(def GAME-SPEED (atom 600))
-(def MAX-SPEED 100)
+;; Timers.
+(def LAST-MOVE-TIME (atom (System/currentTimeMillis))) ;; The exact time of when the game last moved down.
+(def REDRAW-PAUSE 20)
 
 ;; Our playfield.
 (def MATRIX (atom []))
@@ -138,18 +138,36 @@
 ;; ------------------------------------ Create playfield -------------------------------------
 ;; -------------------------------------------------------------------------------------------
 
+(defn get-color
+  [ch]
+  (cond
+    (or (= \b ch) (= \B ch)) {:fg :blue}
+    (or (= \r ch) (= \R ch)) {:fg :red}
+    (or (= \y ch) (= \Y ch)) {:fg :yellow}
+    (or (= \g ch) (= \G ch)) {:fg :green}
+    (or (= \m ch) (= \M ch)) {:fg :magenta}
+    (or (= \c ch) (= \C ch)) {:fg :cyan}
+    (or (= \o ch) (= \O ch)) {:fg :white}
+    :else {:fg :default :bg :default}))
+
 (defn print-line!
-  "Contract: string int -> nil
-  A custom printing function for our swing console."
-  [text lnum]
-  (console/put-string DISPLAY 0 lnum text))
+  "Contract: string int bool -> nil
+  A custom printing function for our swing console.
+  NOTE: Obliously it returns something, since it's a call to map,
+  but the result is useless so I'm contracting it as -> nil."
+  [text lnum use-color]
+  (doall
+    (map-indexed
+      (fn [idx ch]
+        (console/put-string DISPLAY idx lnum (str ch) (when use-color (get-color ch))))
+      text)))
 
 (defn clear-screen!
   "Contract: nil -> nil
   Clear the console window."
   []
   (console/redraw DISPLAY)
-  (Thread/sleep 30)) ;; We need a slight delay when redrawing or it will consume too much CPU.
+  (Thread/sleep REDRAW-PAUSE)) ;; We need a slight delay when redrawing or it will consume too much CPU.
 
 (defn get-empty-matrix
   "Contract: nil -> vector<vector>"
@@ -163,7 +181,7 @@
   (if (empty? matrix) (recur (get-empty-matrix))
     (let [lines (map #(s/join " " %) matrix)]
       (doseq [[line i] (map list lines (range (count lines)))]
-        (print-line! line i)))))
+        (print-line! line i true)))))
 
 (defn clear-matrix!
   "Contract: nil -> nil"
@@ -403,7 +421,8 @@
       :else (move-active-piece! :x new-x :y new-y))))
 
 (defn move-down!
-  "Moves to move the current active tetris piece one step down."
+  "Contract: nil -> nil or error keyword
+  Moves to move the current active tetris piece one step down."
   []
   (let [new-x (inc (:row @ACTIVE-PIECE))
         new-y (:col @ACTIVE-PIECE)]
@@ -412,9 +431,25 @@
       (= :collision (detect-collision new-x new-y (:graphics @ACTIVE-PIECE))) (update-playfield!)
       :else (move-active-piece! :x new-x :y new-y))))
 
+(defn hard-drop!
+  "Contract: nil -> nil or error keyword
+  Drop the player to the bottom of the matrix instantly."
+  []
+  (dotimes [i (count @MATRIX)]
+    (move-down!)))
+
 ;; -------------------------------------------------------------------------------------------
 ;; ---------------------------------------- Game loop ----------------------------------------
 ;; -------------------------------------------------------------------------------------------
+
+(defn get-game-speed []
+  (cond
+    (> @CLEARED-LINES 50) 100
+    (> @CLEARED-LINES 40) 200
+    (> @CLEARED-LINES 30) 300
+    (> @CLEARED-LINES 20) 400
+    (> @CLEARED-LINES 10) 500
+    :else 600))
 
 (defn choose-new-piece!
   "Contract: nil -> string"
@@ -474,19 +509,13 @@
   Shows the game over message and exits when the player presses ESC key."
   []
   (overwrite-high-score!)
-  (print-line! "**** GAME OVER ****" 0)
-  (print-line! (str "YOUR SCORE - " @SCORE) 1)
-  (print-line! (str "HIGH SCORE - " (read-high-score HIGH-SCORE-FILE)) 2)
+  (print-line! "**** GAME OVER ****" 0 false)
+  (print-line! (str "YOUR SCORE - " @SCORE) 1 false)
+  (print-line! (str "HIGH SCORE - " (read-high-score HIGH-SCORE-FILE)) 2 false)
   (clear-screen!)
   (let [input-key (console/get-key-blocking DISPLAY)]
     (if (= :escape input-key) (quit-game!)
       (recur))))
-
-(defn increase-difficulty!
-  "Contract: nil -> nil"
-  []
-  (when (> @GAME-SPEED MAX-SPEED)
-    (swap! GAME-SPEED #(- % 1))))
 
 (defn step!
   "Contract: nil -> nil
@@ -506,9 +535,20 @@
       (= :left user-input) (move-left!)
       (= :right user-input) (move-right!)
       (= :down user-input) (move-down!)
+      (= :up user-input) (hard-drop!)
       (= :escape user-input) (quit-game!)
       (= \z user-input) (rotate-left!)
       (= \x user-input) (rotate-right!))))
+
+(defn force-down!
+  "Contract: nil -> nil
+  Force the current active piece to move down on its own."
+  []
+  (when (>
+         (- (System/currentTimeMillis) @LAST-MOVE-TIME)
+         (get-game-speed))
+    (swap! LAST-MOVE-TIME (fn [x] (System/currentTimeMillis)))
+    (move-down!)))
 
 (defn game-loop
   "Contract: nil -> nil"
@@ -522,6 +562,7 @@
     (insert-piece
       (:graphics @ACTIVE-PIECE) @MATRIX (:row @ACTIVE-PIECE) (:col @ACTIVE-PIECE)))
   (read-input)
+  (force-down!)
   (if (game-over?)
     (game-over!)
     (recur)))
@@ -529,12 +570,12 @@
 (defn show-title-screen!
   "Contract: nil -> char"
   []
-  (print-line! "***** TETRIS *****" 0)
-  (print-line! "PRESS ANY KEY: PLAY" 1)
-  (print-line! "PRESS ESC: QUIT" 2)
-  (print-line! "AROW KEYS: MOVE" 3)
-  (print-line! "PRESS Z: ROTATE L" 4)
-  (print-line! "PRESS X: ROTATE R" 5)
+  (print-line! "***** TETRIS *****" 0 false)
+  (print-line! "PRESS ANY KEY: PLAY" 1 false)
+  (print-line! "PRESS ESC: QUIT" 2 false)
+  (print-line! "AROW KEYS: MOVE" 3 false)
+  (print-line! "PRESS Z: ROTATE L" 4 false)
+  (print-line! "PRESS X: ROTATE R" 5 false)
   (clear-screen!)
   (console/get-key-blocking DISPLAY))
 
@@ -545,10 +586,4 @@
   (-> WINDOW (.getJFrame) (.setLocationRelativeTo nil))
   (show-title-screen!)
   (clear-matrix!)
-  (future
-    (while true
-      (do
-        (increase-difficulty!) ;; Increase the difficulty slowly as the game progresses.
-        (Thread/sleep @GAME-SPEED)
-        (move-down!))))
-  (game-loop))
+  (game-loop)) 
