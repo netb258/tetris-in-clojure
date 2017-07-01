@@ -616,7 +616,7 @@
   Renders the playfield along with the current tetris piece and it's shadow.
   The shadow is the little preview at the bottom, that tells the player where the current tetris piece is going to land."
   []
-  (let [shadow-graphics (map (fn [row] (map #(if (not= "." %) "v" %) row)) (:graphics @ACTIVE-PIECE))
+  (let [shadow-graphics (map (fn [row] (map #(if (not= "." %) "@" %) row)) (:graphics @ACTIVE-PIECE))
         shadow-col (:col @ACTIVE-PIECE)
         shadow-row (get-lowest-row shadow-graphics (:row @ACTIVE-PIECE) shadow-col)
         playfield-with-shadow (insert-piece shadow-graphics @MATRIX shadow-row shadow-col)]
