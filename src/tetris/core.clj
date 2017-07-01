@@ -10,7 +10,7 @@
 ;; -------------------------------------------------------------------------------------------
 
 ;; The window that will hold our game.
-(def WINDOW (t/get-terminal :swing {:rows 22 :cols 19 :font-size 20}))
+(def WINDOW (t/get-terminal :swing {:rows 26 :cols 19 :font-size 20}))
 (def DISPLAY (new Screen WINDOW))
 
 ;; The player's score.
@@ -24,10 +24,19 @@
 
 ;; Our playfield.
 (def MATRIX (atom []))
+(def MATRIX-START-ROW 4)
 
 ;; The active tetris piece that the player moves.
 ;; Possible rotations: CENTER, ROTATE1, ROTATE2, ROTATE3
 (def ACTIVE-PIECE (atom {:id "" :rotation :CENTER :row 0 :col 0 :anchored false :graphics []}))
+
+;; The number of pieces that the player has received so far in the game.
+(def PIECE-COUNT (atom 0))
+
+;; A lazy seq of all pieces that will flow one after the other during the game.
+(def NEXT-PIECE
+  (repeatedly
+    #(first (shuffle ["I" "O" "Z" "S" "J" "L" "T"]))))
 
 ;; All possible tetris pieces and their spawning locations.
 (def START-POSITIONS
@@ -150,6 +159,11 @@
     (or (= \o ch) (= \O ch)) {:fg :white}
     :else {:fg :default :bg :default}))
 
+(defn right-pad
+  "RIght pad string with spaces, making it at least len long."
+  [mystr len]
+  (format (str "%-" len "s") mystr))
+
 (defn print-line!
   "Contract: string int bool -> nil
   A custom printing function for our swing console.
@@ -175,13 +189,13 @@
   (into [] (take 22 (repeat EMPTY-LINE))))
 
 (defn print-matrix!
-  "Contract: vector<vector> -> nil"
-  [matrix]
+  "Contract: vector<vector> int -> nil"
+  [matrix offset]
   (flush)
-  (if (empty? matrix) (recur (get-empty-matrix))
+  (if (empty? matrix) (recur (get-empty-matrix) offset)
     (let [lines (map #(s/join " " %) matrix)]
       (doseq [[line i] (map list lines (range (count lines)))]
-        (print-line! line i true)))))
+        (print-line! line (+ i offset) true)))))
 
 (defn clear-matrix!
   "Contract: nil -> nil"
@@ -337,15 +351,23 @@
       (> move-x x-limit) :bottom-collison
       :else :in-bounds)))
 
+;; Move left is defined a bit later, but rotate-piece! actually needs it to do some adjustments.
+(declare move-left!)
+
 (defn rotate-piece!
-  "Contract: keyword -> nil"
+  "Contract: keyword -> nil
+  NOTE: There is only one situation when the rotation would put us out of bounds:
+  When we have moved too far to the right and we are trying to rotate out of the matrix (can't happen for left).
+  We correct this situation by moving ot the left, until (not= :in-bounds) becomes false (or we :cant-move-there)."
   [rotation]
   (let [current-id (:id @ACTIVE-PIECE)
         current-row (:row @ACTIVE-PIECE)
         current-col (:col @ACTIVE-PIECE)
         new-rotation (get-graphics current-id rotation)]
-    (if (and (= :in-bounds (check-bounds current-row current-col new-rotation @MATRIX))
-             (= :no-collision (detect-collision current-row current-col new-rotation)))
+    (cond
+      (not= :in-bounds (check-bounds current-row current-col new-rotation @MATRIX))
+      (when (not= :cant-move-there (move-left!)) (recur rotation))
+      (= :no-collision (detect-collision current-row current-col new-rotation))
       (swap!
         ACTIVE-PIECE
         (fn [p]
@@ -355,7 +377,7 @@
            :col current-col
            :anchored false
            :graphics new-rotation}))
-      :cant-rotate)))
+      :else :cant-rotate)))
 
 (defn rotate-left!
   "Contract: nil -> nil"
@@ -442,7 +464,7 @@
 ;; ---------------------------------------- Game loop ----------------------------------------
 ;; -------------------------------------------------------------------------------------------
 
-(defn get-game-speed []
+(defn get-game-speed "Contract: nil -> int" []
   (cond
     (> @CLEARED-LINES 50) 100
     (> @CLEARED-LINES 40) 200
@@ -454,8 +476,8 @@
 (defn choose-new-piece!
   "Contract: nil -> string"
   []
-  (let [new-piece (first (shuffle ["I" "O" "Z" "S" "J" "L" "T"]))]
-    (set-active-piece! new-piece)))
+  (set-active-piece! (nth NEXT-PIECE @PIECE-COUNT))
+  (swap! PIECE-COUNT #(inc %)))
 
 (defn get-filled-lines
   "Contract: vector<vector> -> vector<vector>
@@ -527,6 +549,15 @@
       (swap! CLEARED-LINES #(+ num-cleared-lines %))
       (swap! SCORE #(+ (* 100 num-cleared-lines) %)))))
 
+(defn pause-game!
+  "Contract nil -> nil"
+  []
+  (print-line! "*** GAME PAUSED ***" 0 false)
+  (print-line! "*ANY KEY: CONTINUE*" 1 false)
+  (print-line! (right-pad (str "*SCORE: " @SCORE) 19) 2 false)
+  (clear-screen!)
+  (console/get-key-blocking DISPLAY))
+
 (defn read-input
   "Contract: nil -> nil"
   []
@@ -537,6 +568,8 @@
       (= :down user-input) (move-down!)
       (= :up user-input) (hard-drop!)
       (= :escape user-input) (quit-game!)
+      (= :enter user-input) (pause-game!)
+      (= \p user-input) (pause-game!)
       (= \z user-input) (rotate-left!)
       (= \x user-input) (rotate-right!))))
 
@@ -550,6 +583,48 @@
     (swap! LAST-MOVE-TIME (fn [x] (System/currentTimeMillis)))
     (move-down!)))
 
+(defn show-next-piece!
+  "Contract: nil -> nil
+  Displays the next tetris piece that the player will receive."
+  []
+  (print-line! "^^^ NEXT1 PIECE ^^^" 3 false)
+  (let [next-piece-id (nth NEXT-PIECE @PIECE-COUNT)
+        next-piece-graphics (get-graphics next-piece-id :CENTER)
+        start-position (START-POSITIONS next-piece-id)
+        padding (into [] (take 3 (repeat EMPTY-LINE)))
+        x (first start-position)
+        y (last start-position)
+        offset 0]
+    (print-matrix!
+      (insert-piece
+        next-piece-graphics padding x y)
+      offset)))
+
+(defn get-lowest-row
+  "Contract: vector<vector> int int -> int
+  Returns the lowest row that a piece can drop in the matrix."
+  [piece-graphics current-row current-col]
+  (let [new-x (inc current-row)
+        new-y current-col]
+    (cond
+      (not= :in-bounds (check-bounds new-x new-y piece-graphics @MATRIX)) current-row
+      (= :collision (detect-collision new-x new-y piece-graphics)) current-row
+      :else (recur piece-graphics new-x new-y))))
+
+(defn show-playfield!
+  "Contract: nil -> nil
+  Renders the playfield along with the current tetris piece and it's shadow.
+  The shadow is the little preview at the bottom, that tells the player where the current tetris piece is going to land."
+  []
+  (let [shadow-graphics (map (fn [row] (map #(if (not= "." %) "v" %) row)) (:graphics @ACTIVE-PIECE))
+        shadow-col (:col @ACTIVE-PIECE)
+        shadow-row (get-lowest-row shadow-graphics (:row @ACTIVE-PIECE) shadow-col)
+        playfield-with-shadow (insert-piece shadow-graphics @MATRIX shadow-row shadow-col)]
+    (print-matrix!
+      (insert-piece
+        (:graphics @ACTIVE-PIECE) playfield-with-shadow (:row @ACTIVE-PIECE) (:col @ACTIVE-PIECE))
+      MATRIX-START-ROW)))
+
 (defn game-loop
   "Contract: nil -> nil"
   []
@@ -558,9 +633,8 @@
     (choose-new-piece!))
   (step!)
   (clear-screen!)
-  (print-matrix!
-    (insert-piece
-      (:graphics @ACTIVE-PIECE) @MATRIX (:row @ACTIVE-PIECE) (:col @ACTIVE-PIECE)))
+  (show-next-piece!)
+  (show-playfield!)
   (read-input)
   (force-down!)
   (if (game-over?)
@@ -576,6 +650,8 @@
   (print-line! "AROW KEYS: MOVE" 3 false)
   (print-line! "PRESS Z: ROTATE L" 4 false)
   (print-line! "PRESS X: ROTATE R" 5 false)
+  (print-line! "PRESS P: PAUSE" 6 false)
+  (print-line! "PRESS ENTER: PAUSE" 7 false)
   (clear-screen!)
   (console/get-key-blocking DISPLAY))
 
