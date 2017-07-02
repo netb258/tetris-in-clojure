@@ -10,7 +10,7 @@
 ;; -------------------------------------------------------------------------------------------
 
 ;; The window that will hold our game.
-(def WINDOW (t/get-terminal :swing {:rows 26 :cols 19 :font-size 20}))
+(def WINDOW (t/get-terminal :swing {:rows 26 :cols 19 :font-size 18}))
 (def DISPLAY (new Screen WINDOW))
 
 ;; The player's score.
@@ -466,11 +466,12 @@
 
 (defn get-game-speed "Contract: nil -> int" []
   (cond
-    (> @CLEARED-LINES 50) 100
-    (> @CLEARED-LINES 40) 200
-    (> @CLEARED-LINES 30) 300
-    (> @CLEARED-LINES 20) 400
-    (> @CLEARED-LINES 10) 500
+    (> @CLEARED-LINES 100) 100
+    (> @CLEARED-LINES 75) 150
+    (> @CLEARED-LINES 50) 200
+    (> @CLEARED-LINES 40) 350
+    (> @CLEARED-LINES 25) 400
+    (> @CLEARED-LINES 15) 500
     :else 600))
 
 (defn choose-new-piece!
@@ -526,18 +527,13 @@
     (when (> @SCORE high-score)
       (save-high-score HIGH-SCORE-FILE))))
 
-(defn game-over!
+(defn restart-game!
   "Contract: nil -> nil
-  Shows the game over message and exits when the player presses ESC key."
+  Allows the player to start playing the game again after game-over."
   []
-  (overwrite-high-score!)
-  (print-line! "**** GAME OVER ****" 0 false)
-  (print-line! (str "YOUR SCORE - " @SCORE) 1 false)
-  (print-line! (str "HIGH SCORE - " (read-high-score HIGH-SCORE-FILE)) 2 false)
-  (clear-screen!)
-  (let [input-key (console/get-key-blocking DISPLAY)]
-    (if (= :escape input-key) (quit-game!)
-      (recur))))
+  (swap! SCORE (fn [a] 0))
+  (swap! CLEARED-LINES (fn [a] 0))
+  (clear-matrix!))
 
 (defn step!
   "Contract: nil -> nil
@@ -624,6 +620,26 @@
       (insert-piece
         (:graphics @ACTIVE-PIECE) playfield-with-shadow (:row @ACTIVE-PIECE) (:col @ACTIVE-PIECE))
       MATRIX-START-ROW)))
+
+;; game-over! needs to call game-loop early, in order to restart the game.
+(declare game-loop)
+
+(defn game-over!
+  "Contract: nil -> nil
+  Shows the game over message and exits when the player presses ESC key."
+  []
+  (overwrite-high-score!)
+  (print-line! "**** GAME OVER ****" 0 false)
+  (print-line! (str "YOUR SCORE - " @SCORE) 1 false)
+  (print-line! (str "HIGH SCORE - " (read-high-score HIGH-SCORE-FILE)) 2 false)
+  (print-line! (right-pad "ENTER: RESTART" 19) 3 false)
+  (print-line! (right-pad "ESC: QUIT" 19) 4 false)
+  (clear-screen!)
+  (let [input-key (console/get-key-blocking DISPLAY)]
+    (cond
+      (= :escape input-key) (quit-game!)
+      (= :enter input-key) (do (restart-game!) (game-loop))
+      :else (recur))))
 
 (defn game-loop
   "Contract: nil -> nil"
