@@ -152,11 +152,12 @@
   (cond
     (or (= \b ch) (= \B ch)) {:fg :blue}
     (or (= \r ch) (= \R ch)) {:fg :red}
-    (or (= \y ch) (= \Y ch)) {:fg :yellow}
+    (or (= \y ch) (= \Y ch)) {:fg :yellow :styles #{:bold}}
     (or (= \g ch) (= \G ch)) {:fg :green}
     (or (= \m ch) (= \M ch)) {:fg :magenta}
     (or (= \c ch) (= \C ch)) {:fg :cyan}
-    (or (= \o ch) (= \O ch)) {:fg :white}
+    (or (= \o ch) (= \O ch)) {:fg :yellow}
+    (= \= ch) {:fg :white :styles #{:underline}}
     :else {:fg :default :bg :default}))
 
 (defn right-pad
@@ -466,7 +467,8 @@
 
 (defn get-game-speed "Contract: nil -> int" []
   (cond
-    (> @CLEARED-LINES 75) 100
+    (> @CLEARED-LINES 100) 100
+    (> @CLEARED-LINES 75) 120
     (> @CLEARED-LINES 60) 150
     (> @CLEARED-LINES 40) 250
     (> @CLEARED-LINES 30) 350
@@ -518,13 +520,13 @@
   "Contract: string -> int
   Saves the players score to a file."
   [fname]
-  (spit fname (with-out-str (pr @SCORE))))
+  (spit fname (with-out-str (pr [@SCORE @CLEARED-LINES]))))
 
 (defn overwrite-high-score!
   "Contract: nil -> nil"
   []
   (let [high-score (read-high-score HIGH-SCORE-FILE)]
-    (when (> @SCORE high-score)
+    (when (> @SCORE (first high-score))
       (save-high-score HIGH-SCORE-FILE))))
 
 (defn restart-game!
@@ -551,6 +553,7 @@
   (print-line! "*** GAME PAUSED ***" 0 false)
   (print-line! "*ANY KEY: CONTINUE*" 1 false)
   (print-line! (right-pad (str "*SCORE: " @SCORE) 19) 2 false)
+  (print-line! (right-pad (str "*LINES: " @CLEARED-LINES) 19) 3 false)
   (clear-screen!)
   (console/get-key-blocking DISPLAY))
 
@@ -612,7 +615,7 @@
   Renders the playfield along with the current tetris piece and it's shadow.
   The shadow is the little preview at the bottom, that tells the player where the current tetris piece is going to land."
   []
-  (let [shadow-graphics (map (fn [row] (map #(if (not= "." %) "@" %) row)) (:graphics @ACTIVE-PIECE))
+  (let [shadow-graphics (map (fn [row] (map #(if (not= "." %) "=" %) row)) (:graphics @ACTIVE-PIECE))
         shadow-col (:col @ACTIVE-PIECE)
         shadow-row (get-lowest-row shadow-graphics (:row @ACTIVE-PIECE) shadow-col)
         playfield-with-shadow (insert-piece shadow-graphics @MATRIX shadow-row shadow-col)]
@@ -630,10 +633,12 @@
   []
   (overwrite-high-score!)
   (print-line! "**** GAME OVER ****" 0 false)
-  (print-line! (str "YOUR SCORE - " @SCORE) 1 false)
-  (print-line! (str "HIGH SCORE - " (read-high-score HIGH-SCORE-FILE)) 2 false)
-  (print-line! (right-pad "ENTER: RESTART" 19) 3 false)
-  (print-line! (right-pad "ESC: QUIT" 19) 4 false)
+  (print-line! (right-pad (str "YOUR SCORE - " @SCORE) 19) 1 false)
+  (print-line! (right-pad (str "YOUR LINES - " @CLEARED-LINES) 19) 2 false)
+  (print-line! (right-pad (str "HIGH SCORE - " (first (read-high-score HIGH-SCORE-FILE))) 19) 3 false)
+  (print-line! (right-pad (str "HIGH LINES - " (last (read-high-score HIGH-SCORE-FILE))) 19) 4 false)
+  (print-line! (right-pad "ENTER: RESTART" 19) 5 false)
+  (print-line! (right-pad "ESC: QUIT" 19) 6 false)
   (clear-screen!)
   (let [input-key (console/get-key-blocking DISPLAY)]
     (cond
