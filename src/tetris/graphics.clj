@@ -1,4 +1,5 @@
 ;; All the glorious graphics in our game:
+;; Needless to say, this module is pure.
 (ns tetris.graphics)
 
 (def EMPTY-LINE ["." "." "." "." "." "." "." "." "." "."])
@@ -103,4 +104,3 @@
     (= :ROTATE1 rotation) (get PIECES-ROTATED1 piece-id)
     (= :ROTATE2 rotation) (get PIECES-ROTATED2 piece-id)
     (= :ROTATE3 rotation) (get PIECES-ROTATED3 piece-id)))
-
