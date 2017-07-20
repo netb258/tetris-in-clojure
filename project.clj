@@ -6,6 +6,6 @@
   :plugins [[cider/cider-nrepl "0.14.0"]]
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.clojure/tools.nrepl "0.2.12"] ;; Need this to please Cider:
-                 [clojure-lanterna "0.9.7"]] ;; Advanced console library for Clojure.
+                 [quil "2.6.0"]] ;; Graphics library for Clojure.
   :main tetris.core
   :aot :all)

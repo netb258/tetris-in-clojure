@@ -106,9 +106,21 @@
       (= :collision (c/detect-collision new-x new-y (:graphics @active-piece) @playfield)) (update-playfield! playfield active-piece)
       :else (move-active-piece! playfield active-piece :x new-x :y new-y))))
 
+(defn get-lowest-row
+  "Contract: vector<vector> int int -> int
+  Returns the lowest row that a piece can drop in the matrix."
+  [playfield piece-graphics current-row current-col]
+  (let [new-x (inc current-row)
+        new-y current-col]
+    (cond
+      (not= :in-bounds (c/check-bounds new-x new-y piece-graphics playfield)) current-row
+      (= :collision (c/detect-collision new-x new-y piece-graphics playfield)) current-row
+      :else (recur playfield piece-graphics new-x new-y))))
+
 (defn hard-drop!
   "Contract: atom atom -> nil or error keyword
   Drop the player to the bottom of the matrix instantly."
   [playfield active-piece]
-  (dotimes [i (count @playfield)]
-    (move-down! playfield active-piece)))
+  (let [lowest-row (get-lowest-row @playfield (:graphics @active-piece) (:row @active-piece) (:col @active-piece))]
+    (move-active-piece! playfield active-piece :x lowest-row :y (:col @active-piece))
+    (update-playfield! playfield active-piece)))
