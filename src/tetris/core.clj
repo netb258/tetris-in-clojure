@@ -5,6 +5,8 @@
             [tetris.collision :as c]
             [tetris.move :as mv]
             [tetris.graphics :as g]
+            [tetris.score :as score]
+            [tetris.gui :as gui]
             [quil.core :as q])
   (:import java.awt.event.KeyEvent)
   (:gen-class))
@@ -37,107 +39,6 @@
 (def NEXT-PIECE
   (repeatedly
     #(first (shuffle ["I" "O" "Z" "S" "J" "L" "T"]))))
-
-;; -------------------------------------------------------------------------------------------
-;; ------------------------------------------ SCORE ------------------------------------------
-;; -------------------------------------------------------------------------------------------
-
-(defn read-high-score
-  "Contract: string -> int
-  Reads the players best score from a file"
-  [fname]
-  (read-string (slurp fname)))
-
-(defn save-high-score
-  "Contract: string -> int
-  Saves the players score to a file."
-  [fname]
-  (spit fname (with-out-str (pr [@SCORE @CLEARED-LINES]))))
-
-(defn overwrite-high-score!
-  "Contract: nil -> nil"
-  []
-  (let [high-score (read-high-score HIGH-SCORE-FILE)]
-    (when (> @SCORE (first high-score))
-      (save-high-score HIGH-SCORE-FILE))))
-
-;; -------------------------------------------------------------------------------------------
-;; ------------------------------------------- GUI -------------------------------------------
-;; -------------------------------------------------------------------------------------------
-
-(def WINDOW-WIDTH 250)
-(def WINDOW-HEIGHT 650)
-(def SQUARE-WIDTH 25)
-(def SQUARE-HEIGHT 25)
-(def FPS 30)
-
-(defn setup []
-  (q/frame-rate FPS)
-  (q/stroke 0)
-  (q/stroke-weight 0)
-  (q/background 255 255 255))
-
-(defn get-color
-  [ch]
-  (cond
-    (or (= \b ch) (= \B ch)) (q/fill 0 75 255)
-    (or (= \r ch) (= \R ch)) (q/fill 255 17 0)
-    (or (= \y ch) (= \Y ch)) (q/fill 254 226 62)
-    (or (= \g ch) (= \G ch)) (q/fill 99 200 62)
-    (or (= \m ch) (= \M ch)) (q/fill 219 48 130)
-    (or (= \c ch) (= \C ch)) (q/fill 27 161 266)
-    (or (= \o ch) (= \O ch)) (q/fill 255 129 0)
-    (= \= ch) (q/fill 220 220 220)
-    :else (q/fill 255 255 255)))
-
-(defn print-line!
-  [text lnum use-color]
-  (doall
-    (map-indexed
-      (fn [idx ch]
-        (get-color ch)
-        (q/rect (* idx SQUARE-WIDTH) (* lnum SQUARE-HEIGHT) SQUARE-WIDTH SQUARE-HEIGHT))
-      text)))
-
-(defn print-matrix!
-  [matrix offset]
-  (if (empty? matrix) (recur (m/get-empty-matrix) offset)
-    (let [lines (map #(clojure.string/join "" %) matrix)]
-      (doseq [[line i] (map list lines (range (count lines)))]
-        (print-line! line (+ i offset) true)))))
-
-(defn get-key []
-  (let [raw-key (q/raw-key)
-        the-key-code (q/key-code)
-        the-key-pressed (if (= processing.core.PConstants/CODED (int raw-key)) the-key-code raw-key)]
-    the-key-pressed))
-
-(defn show-pause-menu! []
-  (q/background 0 0 0)
-  (q/text-size 20)
-  (q/text-align :center)
-  (q/text "TETRIS" (/ WINDOW-WIDTH 2) 50)
-  (q/text-size 15)
-  (q/text-align :left)
-  (q/text "MOUSE CLICK: PLAY/PAUSE" 0 90)
-  (q/text "PRESS ESC: QUIT" 0 120)
-  (q/text "AROW KEYS: MOVE" 0 140)
-  (q/text "PRESS Z: ROTATE L" 0 160)
-  (q/text "PRESS X: ROTATE R" 0 180)
-  (q/text (str "*SCORE: " @SCORE) 0 230)
-  (q/text (str "*LINES: " @CLEARED-LINES) 0 250))
-
-(defn show-game-over-screen! []
-  (q/background 0 0 0)
-  (q/text-size 20)
-  (q/text-align :center)
-  (q/text "GAME OVER" (/ WINDOW-WIDTH 2) 50)
-  (q/text-size 15)
-  (q/text-align :left)
-  (q/text (str "YOUR SCORE: " @SCORE) 0 90)
-  (q/text (str "YOUR LINES: " @CLEARED-LINES) 0 120)
-  (q/text (str "HIGH SCORE: " (first (read-high-score HIGH-SCORE-FILE))) 0 150)
-  (q/text (str "HIGH LINES: " (last (read-high-score HIGH-SCORE-FILE))) 0 180))
 
 ;; -------------------------------------------------------------------------------------------
 ;; ---------------------------------------- Game loop ----------------------------------------
@@ -211,28 +112,15 @@
       (swap! CLEARED-LINES #(+ num-cleared-lines %))
       (swap! SCORE #(+ (* 100 num-cleared-lines) %)))))
 
-;;(defn pause-game!
-;;  "Contract nil -> nil"
-;;  []
-;;  (gui/print-line! "*** GAME PAUSED ***" 0 false)
-;;  (gui/print-line! "*ANY KEY: CONTINUE*" 1 false)
-;;  (gui/print-line! (gui/right-pad (str "*SCORE: " @SCORE) 19) 2 false)
-;;  (gui/print-line! (gui/right-pad (str "*LINES: " @CLEARED-LINES) 19) 3 false)
-;;  (gui/clear-screen!)
-;;  (gui/get-key-blocking))
-
 (defn read-input
   "Contract: nil -> nil"
   []
-  (let [user-input (get-key)]
+  (let [user-input (gui/get-key)]
     (cond
       (= KeyEvent/VK_LEFT user-input) (mv/move-left! MATRIX ACTIVE-PIECE)
       (= KeyEvent/VK_RIGHT user-input) (mv/move-right! MATRIX ACTIVE-PIECE)
       (= KeyEvent/VK_DOWN user-input) (mv/move-down! MATRIX ACTIVE-PIECE)
       (= KeyEvent/VK_UP user-input) (mv/hard-drop! MATRIX ACTIVE-PIECE)
-      ;; (= :escape user-input) (quit-game!)
-      ;; (= :enter user-input) (pause-game!)
-      ;; (= \p user-input) (pause-game!)
       (= \z user-input) (r/rotate-left! MATRIX ACTIVE-PIECE)
       (= \x user-input) (r/rotate-right! MATRIX ACTIVE-PIECE))))
 
@@ -250,7 +138,6 @@
   "Contract: nil -> nil
   Displays the next tetris piece that the player will receive."
   []
-  ;;(gui/print-line! "^^^ NEXT1 PIECE ^^^" 3 false)
   (let [next-piece-id (nth NEXT-PIECE @PIECE-COUNT)
         next-piece-graphics (g/get-graphics next-piece-id :CENTER)
         start-position (mv/START-POSITIONS next-piece-id)
@@ -258,7 +145,7 @@
         x (first start-position)
         y (last start-position)
         offset 0]
-    (print-matrix!
+    (gui/print-matrix!
       (m/insert-piece
         next-piece-graphics padding x y)
       offset)))
@@ -269,7 +156,12 @@
   The shadow is the little preview at the bottom, that tells the player where the current tetris piece is going to land."
   []
   (cond
-    (game-over?) (show-game-over-screen!)
+    (game-over?)
+    (gui/show-game-over-screen!
+      @SCORE
+      @CLEARED-LINES
+      (first (score/read-high-score HIGH-SCORE-FILE))
+      (last (score/read-high-score HIGH-SCORE-FILE)))
     @GAME-RUNNING?
     (do
       (show-next-piece!)
@@ -277,11 +169,11 @@
             shadow-col (:col @ACTIVE-PIECE)
             shadow-row (mv/get-lowest-row @MATRIX shadow-graphics (:row @ACTIVE-PIECE) shadow-col)
             playfield-with-shadow (m/insert-piece shadow-graphics @MATRIX shadow-row shadow-col)]
-        (print-matrix!
+        (gui/print-matrix!
           (m/insert-piece
             (:graphics @ACTIVE-PIECE) playfield-with-shadow (:row @ACTIVE-PIECE) (:col @ACTIVE-PIECE))
           MATRIX-START-ROW)))
-    :else (show-pause-menu!)))
+    :else (gui/show-pause-menu! @SCORE @CLEARED-LINES)))
 
 (defn game-loop
   "Contract: nil -> nil"
@@ -294,7 +186,7 @@
       (step!)
       (force-down!)
       (if (game-over?)
-        (overwrite-high-score!)
+        (score/overwrite-high-score! HIGH-SCORE-FILE @SCORE @CLEARED-LINES)
         (do
           (Thread/sleep 10) ;; The loop must not go too fast, or we'll waste CPU.
           (recur))))
@@ -308,10 +200,10 @@
   (q/defsketch example
     :title "Tetris board"
     :settings #(q/smooth 2)
-    :setup setup
+    :setup gui/setup
     :key-pressed read-input
     :mouse-clicked #(swap! GAME-RUNNING? not)
     :draw show-playfield!
     :features [:exit-on-close]
-    :size [WINDOW-WIDTH WINDOW-HEIGHT])
+    :size [gui/WINDOW-WIDTH gui/WINDOW-HEIGHT])
   (game-loop))

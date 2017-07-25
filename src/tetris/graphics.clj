@@ -1,4 +1,4 @@
-;; All the glorious graphics in our game:
+;; All the glorious graphics in our game, represented as data structures.
 (ns tetris.graphics)
 
 (def EMPTY-LINE ["." "." "." "." "." "." "." "." "." "."])
@@ -103,4 +103,3 @@
     (= :ROTATE1 rotation) (get PIECES-ROTATED1 piece-id)
     (= :ROTATE2 rotation) (get PIECES-ROTATED2 piece-id)
     (= :ROTATE3 rotation) (get PIECES-ROTATED3 piece-id)))
-
