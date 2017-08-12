@@ -33,7 +33,7 @@
             [tetris.graphics :as g]))
 
 (defn rotate-piece!
-  "Contract: keyword -> nil
+  "Contract: atom atom keyword -> nil
   NOTE: There is only one situation when the rotation would put us out of bounds:
   When we have moved too far to the right and we are trying to rotate out of the matrix (can't happen for left).
   We correct this situation by moving ot the left, until (not= :in-bounds) becomes false (or we :cant-move-there)."
@@ -58,7 +58,7 @@
       :else :cant-rotate)))
 
 (defn rotate-left!
-  "Contract: nil -> nil"
+  "Contract: atom atom -> nil"
   [playfield active-piece]
   (let [current-rotation (:rotation @active-piece)]
    (cond
@@ -68,7 +68,7 @@
      :else (rotate-piece! playfield active-piece :CENTER))))
 
 (defn rotate-right!
-  "Contract: nil -> nil"
+  "Contract: atom atom -> nil"
   [playfield active-piece]
   (let [current-rotation (:rotation @active-piece)]
     (cond
