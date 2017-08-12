@@ -121,6 +121,7 @@
       (= KeyEvent/VK_RIGHT user-input) (mv/move-right! MATRIX ACTIVE-PIECE)
       (= KeyEvent/VK_DOWN user-input) (mv/move-down! MATRIX ACTIVE-PIECE)
       (= KeyEvent/VK_UP user-input) (mv/hard-drop! MATRIX ACTIVE-PIECE)
+      (= \c user-input) (swap! GAME-RUNNING? not)
       (= \z user-input) (r/rotate-left! MATRIX ACTIVE-PIECE)
       (= \x user-input) (r/rotate-right! MATRIX ACTIVE-PIECE))))
 
@@ -163,7 +164,7 @@
       (first (score/read-high-score HIGH-SCORE-FILE))
       (last (score/read-high-score HIGH-SCORE-FILE)))
     @GAME-RUNNING?
-    (do
+    (do ;; Show the next piece the player will receive, also show the current piece with a preview shadow:
       (show-next-piece!)
       (let [shadow-graphics (map (fn [row] (map #(if (not= "." %) "=" %) row)) (:graphics @ACTIVE-PIECE))
             shadow-col (:col @ACTIVE-PIECE)

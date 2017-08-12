@@ -8,9 +8,8 @@
   "Contract: int int vector<vector> vector<vector> -> keyword
   Takes the row and col of where the player is trying to move and checks if they are within the matrix."
   [move-x move-y piece-graphics matrix]
-  (let [piece-cleaned (m/clean-piece piece-graphics)
-        piece-width (count (last (sort-by count piece-cleaned)))
-        piece-height (count piece-cleaned)
+  (let [piece-width (count (last (sort-by count piece-graphics)))
+        piece-height (count piece-graphics)
         y-limit (- (count g/EMPTY-LINE) piece-width)
         x-limit (- (count matrix) piece-height)]
     (cond
@@ -34,7 +33,7 @@
   "Contract: int int vector<vector> vector<vector> -> keyword
   Returns :collision if the active tetris piece will collide with anything in the matrix at the given coordinates."
   [move-row move-col rotation-graphics playfield]
-  (let [piece-height (count (m/clean-piece rotation-graphics))
+  (let [piece-height (count rotation-graphics)
         portrait (m/insert-piece rotation-graphics (m/get-empty-matrix) move-row move-col)
         piece-slice (subvec portrait move-row (+ move-row piece-height))
         move-slice (subvec playfield move-row (+ move-row piece-height))

@@ -46,22 +46,20 @@
   ([active-piece id] (set-active-piece! active-piece id :CENTER (START-POSITIONS id)))
   ([active-piece id [row col]] (set-active-piece! active-piece id (:rotation @active-piece) [row col]))
   ([active-piece id rotation [row col]] ;; Contract: atom string keyword [int int] -> nil
-   (swap!
-     active-piece
-     (fn [p] {:id id
-              :rotation rotation
-              :row row
-              :col col
-              :anchored false
-              :graphics (g/get-graphics id rotation)}))))
+   (swap! active-piece (fn [p]
+                         {:id id
+                          :rotation rotation
+                          :row row
+                          :col col
+                          :anchored false
+                          :graphics (g/get-graphics id rotation)}))))
 
 (defn update-playfield!
   "Contract: atom atom -> nil
   Note: Both arguments are atoms that will be swapped."
   [playfield active-piece]
   (swap! playfield
-         #(m/downcase-matrix
-            (m/insert-piece (:graphics @active-piece) % (:row @active-piece) (:col @active-piece))))
+         #(m/insert-piece (:graphics @active-piece) % (:row @active-piece) (:col @active-piece)))
   (swap! active-piece #(assoc % :anchored true)))
 
 (defn move-active-piece!
