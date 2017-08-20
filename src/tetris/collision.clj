@@ -25,7 +25,7 @@
   (map #(and (not= "." %1) (not= "." %2)) piece-row move-row))
 
 (defn count-collisions
-  "Contract: vector<bool> -> int"
+  "Contract: vector<vector<bool>> -> int"
   [collision-vector]
   (count (filter #(some #{true} %) collision-vector)))
 
