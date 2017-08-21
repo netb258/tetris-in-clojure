@@ -94,14 +94,6 @@
   []
   (System/exit 0))
 
-(defn restart-game!
-  "Contract: nil -> nil
-  Allows the player to start playing the game again after game-over."
-  []
-  (swap! SCORE (fn [a] 0))
-  (swap! CLEARED-LINES (fn [a] 0))
-  (clear-playfield!))
-
 (defn step!
   "Contract: nil -> nil
   Perform the next step in the game (if the player cleared a line, count the score and stuff)"
