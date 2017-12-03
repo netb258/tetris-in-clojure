@@ -104,6 +104,39 @@
       (swap! CLEARED-LINES #(+ num-cleared-lines %))
       (swap! SCORE #(+ (* 100 num-cleared-lines) %)))))
 
+(defn force-down!
+  "Contract: nil -> nil
+  Force the current active piece to move down on its own."
+  []
+  (when (>
+         (- (System/currentTimeMillis) @LAST-MOVE-TIME)
+         (get-game-speed))
+    (swap! LAST-MOVE-TIME (fn [x] (System/currentTimeMillis)))
+    (mv/move-down! MATRIX ACTIVE-PIECE)))
+
+(defn game-loop
+  "Contract: nil -> nil"
+  []
+  (if @GAME-RUNNING?
+    (do
+      (when (or (= "" (:id @ACTIVE-PIECE))
+                (= true (:anchored @ACTIVE-PIECE)))
+        (choose-new-piece!))
+      (step!)
+      (force-down!)
+      (if (game-over?)
+        (score/overwrite-high-score! HIGH-SCORE-FILE @SCORE @CLEARED-LINES)
+        (do
+          (Thread/sleep 10) ;; The loop must not go too fast, or we'll waste CPU.
+          (recur))))
+    (do
+      (Thread/sleep 10) ;; The loop must not go too fast, or we'll waste CPU.
+      (recur))))
+
+;; -------------------------------------------------------------------------------------------
+;; ----------------------------------- MAIN - Display game -----------------------------------
+;; -------------------------------------------------------------------------------------------
+
 (defn read-input
   "Contract: nil -> nil"
   []
@@ -116,16 +149,6 @@
       (= \c user-input) (swap! GAME-RUNNING? not)
       (= \z user-input) (r/rotate-left! MATRIX ACTIVE-PIECE)
       (= \x user-input) (r/rotate-right! MATRIX ACTIVE-PIECE))))
-
-(defn force-down!
-  "Contract: nil -> nil
-  Force the current active piece to move down on its own."
-  []
-  (when (>
-         (- (System/currentTimeMillis) @LAST-MOVE-TIME)
-         (get-game-speed))
-    (swap! LAST-MOVE-TIME (fn [x] (System/currentTimeMillis)))
-    (mv/move-down! MATRIX ACTIVE-PIECE)))
 
 (defn show-next-piece!
   "Contract: nil -> nil
@@ -167,25 +190,6 @@
             (:graphics @ACTIVE-PIECE) playfield-with-shadow (:row @ACTIVE-PIECE) (:col @ACTIVE-PIECE))
           MATRIX-START-ROW)))
     :else (gui/show-pause-menu! @SCORE @CLEARED-LINES)))
-
-(defn game-loop
-  "Contract: nil -> nil"
-  []
-  (if @GAME-RUNNING?
-    (do
-      (when (or (= "" (:id @ACTIVE-PIECE))
-                (= true (:anchored @ACTIVE-PIECE)))
-        (choose-new-piece!))
-      (step!)
-      (force-down!)
-      (if (game-over?)
-        (score/overwrite-high-score! HIGH-SCORE-FILE @SCORE @CLEARED-LINES)
-        (do
-          (Thread/sleep 10) ;; The loop must not go too fast, or we'll waste CPU.
-          (recur))))
-    (do
-      (Thread/sleep 10) ;; The loop must not go too fast, or we'll waste CPU.
-      (recur))))
 
 (defn -main []
   (println "Done!") ;; Signal that we have loaded the program.
