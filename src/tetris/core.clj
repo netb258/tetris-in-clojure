@@ -146,7 +146,7 @@
       (= KeyEvent/VK_RIGHT user-input) (mv/move-right! MATRIX ACTIVE-PIECE)
       (= KeyEvent/VK_DOWN user-input) (mv/move-down! MATRIX ACTIVE-PIECE)
       (= KeyEvent/VK_UP user-input) (mv/hard-drop! MATRIX ACTIVE-PIECE)
-      (= \c user-input) (swap! GAME-RUNNING? not)
+      (= \newline user-input) (swap! GAME-RUNNING? not)
       (= \z user-input) (r/rotate-left! MATRIX ACTIVE-PIECE)
       (= \x user-input) (r/rotate-right! MATRIX ACTIVE-PIECE))))
 
