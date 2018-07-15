@@ -1,4 +1,4 @@
-A small Tetris clone written in Clojure.
+A Tetris clone written in Clojure.
 
 Uses the Quil library for rendering.
 
