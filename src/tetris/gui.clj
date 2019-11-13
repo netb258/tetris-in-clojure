@@ -1,5 +1,4 @@
 ;; Functions that draw the game.
-;; TODO: Add some comments to these functions.
 (ns tetris.gui
   (:require [quil.core :as q]
             [tetris.matrix :as m])
@@ -52,8 +51,10 @@
         the-key-pressed (if (= processing.core.PConstants/CODED (int raw-key)) the-key-code raw-key)]
     the-key-pressed))
 
-(defn show-pause-menu! [score lines]
-  (q/background 0 0 0)
+(defn show-pause-menu! [score lines high-score high-lines]
+  (q/background 255 255 255)
+  (q/stroke 0 0 0)
+  (q/fill 0 0 0)
   (q/text-size 20)
   (q/text-align :center)
   (q/text "TETRIS" (/ WINDOW-WIDTH 2) 50)
@@ -65,10 +66,14 @@
   (q/text "PRESS Z: ROTATE L" 0 160)
   (q/text "PRESS X: ROTATE R" 0 180)
   (q/text (str "*SCORE: " score) 0 230)
-  (q/text (str "*LINES: " lines) 0 250))
+  (q/text (str "*LINES: " lines) 0 250)
+  (q/text (str "HIGH SCORE: " high-score) 0 270)
+  (q/text (str "HIGH LINES: " high-lines) 0 290))
 
 (defn show-game-over-screen! [score lines high-score high-lines]
   (q/background 0 0 0)
+  (q/stroke 255 255 255)
+  (q/fill 255 255 255)
   (q/text-size 20)
   (q/text-align :center)
   (q/text "GAME OVER" (/ WINDOW-WIDTH 2) 50)
