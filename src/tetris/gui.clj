@@ -9,7 +9,7 @@
 (def WINDOW-HEIGHT 650)
 (def SQUARE-WIDTH 25)
 (def SQUARE-HEIGHT 25)
-(def FPS 30)
+(def FPS 50)
 
 (defn setup []
   (q/frame-rate FPS)
