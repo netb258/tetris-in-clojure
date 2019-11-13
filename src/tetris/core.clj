@@ -12,7 +12,7 @@
   (:gen-class))
 
 ;; -------------------------------------------------------------------------------------------
-;; ----------------------------------------- GLOBALS -----------------------------------------
+;; ---------------------------------------- Game State ---------------------------------------
 ;; -------------------------------------------------------------------------------------------
 
 ;; The player's score.
@@ -40,6 +40,10 @@
   (repeatedly
     #(first (shuffle ["I" "O" "Z" "S" "J" "L" "T"]))))
 
+;; We want these keys to be repeated quickly, so we won't rely on the system repeat rate.
+(def is-left-pressed? (atom false))
+(def is-right-pressed? (atom false))
+
 ;; -------------------------------------------------------------------------------------------
 ;; ---------------------------------------- Game loop ----------------------------------------
 ;; -------------------------------------------------------------------------------------------
@@ -51,7 +55,8 @@
 
 (defn get-game-speed "Contract: nil -> int" []
   (cond
-    (> @CLEARED-LINES 100) 60
+    (> @CLEARED-LINES 120) 60
+    (> @CLEARED-LINES 100) 65
     (> @CLEARED-LINES 75) 80
     (> @CLEARED-LINES 60) 120
     (> @CLEARED-LINES 40) 250
@@ -117,38 +122,52 @@
 (defn game-loop
   "Contract: nil -> nil"
   []
-  (if @GAME-RUNNING?
-    (do
-      (when (or (= "" (:id @ACTIVE-PIECE))
-                (= true (:anchored @ACTIVE-PIECE)))
-        (choose-new-piece!))
-      (step!)
-      (force-down!)
-      (if (game-over?)
-        (score/overwrite-high-score! HIGH-SCORE-FILE @SCORE @CLEARED-LINES)
-        (do
-          (Thread/sleep 10) ;; The loop must not go too fast, or we'll waste CPU.
-          (recur))))
-    (do
-      (Thread/sleep 10) ;; The loop must not go too fast, or we'll waste CPU.
-      (recur))))
+  (when @GAME-RUNNING?
+    (when (or (= "" (:id @ACTIVE-PIECE))
+              (= true (:anchored @ACTIVE-PIECE)))
+      (choose-new-piece!))
+    (step!)
+    (force-down!)
+    (when (game-over?)
+      (score/overwrite-high-score! HIGH-SCORE-FILE @SCORE @CLEARED-LINES))))
 
 ;; -------------------------------------------------------------------------------------------
 ;; ----------------------------------- MAIN - Display game -----------------------------------
 ;; -------------------------------------------------------------------------------------------
 
-(defn read-input
+(defn key-down
   "Contract: nil -> nil"
   []
   (let [user-input (gui/get-key)]
     (cond
-      (= KeyEvent/VK_LEFT user-input) (mv/move-left! MATRIX ACTIVE-PIECE)
-      (= KeyEvent/VK_RIGHT user-input) (mv/move-right! MATRIX ACTIVE-PIECE)
+      (= KeyEvent/VK_LEFT user-input) (reset! is-left-pressed? true)
+      (= KeyEvent/VK_RIGHT user-input) (reset! is-right-pressed? true)
       (= KeyEvent/VK_DOWN user-input) (mv/move-down! MATRIX ACTIVE-PIECE)
       (= KeyEvent/VK_UP user-input) (mv/hard-drop! MATRIX ACTIVE-PIECE)
       (= \newline user-input) (swap! GAME-RUNNING? not)
       (= \z user-input) (r/rotate-left! MATRIX ACTIVE-PIECE)
       (= \x user-input) (r/rotate-right! MATRIX ACTIVE-PIECE))))
+
+(defn key-up
+  "Contract: nil -> nil"
+  []
+  (let [user-input (gui/get-key)]
+    (cond
+      (= KeyEvent/VK_LEFT user-input) (reset! is-left-pressed? false)
+      (= KeyEvent/VK_RIGHT user-input) (reset! is-right-pressed? false))))
+
+(defn key-timer []
+  "This function starts a timer which repeatedly checks if the left and right arrow keys are pressed.
+  If they are pressed, then the current tetris piece is moved left or right respectively.
+  We are doing this because we want the keydown to be fast (we don't want to rely on the system repeat rate)."
+  (future
+    (loop []
+      (let [repeat-rate 120
+            loop-rate 1]
+        (cond
+          @is-left-pressed? (do (mv/move-left! MATRIX ACTIVE-PIECE) (Thread/sleep repeat-rate) (recur))
+          @is-right-pressed? (do (mv/move-right! MATRIX ACTIVE-PIECE) (Thread/sleep repeat-rate) (recur))
+          :else (do (Thread/sleep loop-rate) (recur)))))))
 
 (defn show-next-piece!
   "Contract: nil -> nil
@@ -172,13 +191,13 @@
   The shadow is the little preview at the bottom, that tells the player where the current tetris piece is going to land."
   []
   (cond
-    (game-over?)
+    (game-over?) ;; If the game is over, then show the GAME OVER screen.
     (gui/show-game-over-screen!
       @SCORE
       @CLEARED-LINES
       (first (score/read-high-score HIGH-SCORE-FILE))
       (last (score/read-high-score HIGH-SCORE-FILE)))
-    @GAME-RUNNING?
+    @GAME-RUNNING? ;; If the game is currently running, then draw all the graphics.
     (do ;; Show the next piece the player will receive, also show the current piece with a preview shadow:
       (show-next-piece!)
       (let [shadow-graphics (map (fn [row] (map #(if (not= "." %) "=" %) row)) (:graphics @ACTIVE-PIECE))
@@ -189,18 +208,28 @@
           (m/insert-piece
             (:graphics @ACTIVE-PIECE) playfield-with-shadow (:row @ACTIVE-PIECE) (:col @ACTIVE-PIECE))
           MATRIX-START-ROW)))
-    :else (gui/show-pause-menu! @SCORE @CLEARED-LINES)))
+    ;; If the game is not running and is not over, then it must be paused.
+    :else (gui/show-pause-menu!
+            @SCORE
+            @CLEARED-LINES
+            (first (score/read-high-score HIGH-SCORE-FILE))
+            (last (score/read-high-score HIGH-SCORE-FILE)))))
+
+(defn run-game! []
+  (game-loop)
+  (show-playfield!))
 
 (defn -main []
   (println "Done!") ;; Signal that we have loaded the program.
   (clear-playfield!)
   (q/defsketch example
-    :title "Tetris board"
+    :title "Tetris"
     :settings #(q/smooth 2)
     :setup gui/setup
-    :key-pressed read-input
+    :key-pressed key-down
+    :key-released key-up
     :mouse-clicked #(swap! GAME-RUNNING? not)
-    :draw show-playfield!
+    :draw run-game!
     :features [:exit-on-close]
     :size [gui/WINDOW-WIDTH gui/WINDOW-HEIGHT])
-  (game-loop))
+  (key-timer))
