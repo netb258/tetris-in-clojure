@@ -162,7 +162,7 @@
   We are doing this because we want the keydown to be fast (we don't want to rely on the system repeat rate)."
   (future
     (loop []
-      (let [repeat-rate 120
+      (let [repeat-rate 110
             loop-rate 1]
         (cond
           @is-left-pressed? (do (mv/move-left! MATRIX ACTIVE-PIECE) (Thread/sleep repeat-rate) (recur))
