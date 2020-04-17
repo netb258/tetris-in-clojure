@@ -44,8 +44,8 @@
 (def is-left-pressed? (atom false))
 (def is-right-pressed? (atom false))
 
-;; The player can move left and right in a 100ms interval.
-(def player-move-interval 100)
+;; The player can move left and right in a 105ms interval.
+(def player-move-interval 105)
 ;; The exact time when the player last moved.
 (def player-last-move-time (atom (System/currentTimeMillis)))
 
@@ -118,7 +118,7 @@
   "Contract: nil -> nil
   Force the current active piece to move down on its own."
   []
-  (when (>
+  (when (>=
          (- (System/currentTimeMillis) @LAST-MOVE-TIME)
          (get-game-speed))
     (swap! LAST-MOVE-TIME (fn [x] (System/currentTimeMillis)))
@@ -130,7 +130,7 @@
   []
   (when (and
           (= true @is-left-pressed?)
-          (>
+          (>=
            (- (System/currentTimeMillis) @player-last-move-time)
            player-move-interval))
     (swap! player-last-move-time (fn [x] (System/currentTimeMillis)))
@@ -142,7 +142,7 @@
   []
   (when (and
           (= true @is-right-pressed?)
-          (>
+          (>=
            (- (System/currentTimeMillis) @player-last-move-time)
            player-move-interval))
     (swap! player-last-move-time (fn [x] (System/currentTimeMillis)))
