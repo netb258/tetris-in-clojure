@@ -44,6 +44,11 @@
 (def is-left-pressed? (atom false))
 (def is-right-pressed? (atom false))
 
+;; The player can move left and right in a 100ms interval.
+(def player-move-interval 100)
+;; The exact time when the player last moved.
+(def player-last-move-time (atom (System/currentTimeMillis)))
+
 ;; -------------------------------------------------------------------------------------------
 ;; ---------------------------------------- Game loop ----------------------------------------
 ;; -------------------------------------------------------------------------------------------
@@ -119,6 +124,30 @@
     (swap! LAST-MOVE-TIME (fn [x] (System/currentTimeMillis)))
     (mv/move-down! MATRIX ACTIVE-PIECE)))
 
+(defn force-left!
+  "Contract: nil -> nil
+  Force the current active piece to move left."
+  []
+  (when (and
+          (= true @is-left-pressed?)
+          (>
+           (- (System/currentTimeMillis) @player-last-move-time)
+           player-move-interval))
+    (swap! player-last-move-time (fn [x] (System/currentTimeMillis)))
+    (mv/move-left! MATRIX ACTIVE-PIECE)))
+
+(defn force-right!
+  "Contract: nil -> nil
+  Force the current active piece to move right."
+  []
+  (when (and
+          (= true @is-right-pressed?)
+          (>
+           (- (System/currentTimeMillis) @player-last-move-time)
+           player-move-interval))
+    (swap! player-last-move-time (fn [x] (System/currentTimeMillis)))
+    (mv/move-right! MATRIX ACTIVE-PIECE)))
+
 (defn game-loop
   "Contract: nil -> nil"
   []
@@ -128,6 +157,8 @@
       (choose-new-piece!))
     (step!)
     (force-down!)
+    (force-left!)
+    (force-right!)
     (when (game-over?)
       (score/overwrite-high-score! HIGH-SCORE-FILE @SCORE @CLEARED-LINES))))
 
@@ -155,19 +186,6 @@
     (cond
       (= KeyEvent/VK_LEFT user-input) (reset! is-left-pressed? false)
       (= KeyEvent/VK_RIGHT user-input) (reset! is-right-pressed? false))))
-
-(defn key-timer []
-  "This function starts a timer which repeatedly checks if the left and right arrow keys are pressed.
-  If they are pressed, then the current tetris piece is moved left or right respectively.
-  We are doing this because we want the keydown to be fast (we don't want to rely on the system repeat rate)."
-  (future
-    (loop []
-      (let [repeat-rate 110
-            loop-rate 1]
-        (cond
-          @is-left-pressed? (do (mv/move-left! MATRIX ACTIVE-PIECE) (Thread/sleep repeat-rate) (recur))
-          @is-right-pressed? (do (mv/move-right! MATRIX ACTIVE-PIECE) (Thread/sleep repeat-rate) (recur))
-          :else (do (Thread/sleep loop-rate) (recur)))))))
 
 (defn show-next-piece!
   "Contract: nil -> nil
@@ -220,7 +238,6 @@
   (show-playfield!))
 
 (defn -main []
-  (println "Done!") ;; Signal that we have loaded the program.
   (clear-playfield!)
   (q/defsketch example
     :title "Tetris"
@@ -231,5 +248,4 @@
     :mouse-clicked #(swap! GAME-RUNNING? not)
     :draw run-game!
     :features [:exit-on-close]
-    :size [gui/WINDOW-WIDTH gui/WINDOW-HEIGHT])
-  (key-timer))
+    :size [gui/WINDOW-WIDTH gui/WINDOW-HEIGHT]))
