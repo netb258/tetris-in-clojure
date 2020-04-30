@@ -131,8 +131,10 @@
   (when (and
           (= true @is-left-pressed?)
           (>=
-           (- (System/currentTimeMillis) @player-last-move-time)
-           player-move-interval))
+            (- (System/currentTimeMillis) @player-last-move-time)
+            player-move-interval))
+    ;; We don't want the playfield to be updated while we are moving.
+    (reset! mv/update-interval (future (Thread/sleep 100) (inc 0)))
     (swap! player-last-move-time (fn [x] (System/currentTimeMillis)))
     (mv/move-left! MATRIX ACTIVE-PIECE)))
 
@@ -143,8 +145,10 @@
   (when (and
           (= true @is-right-pressed?)
           (>=
-           (- (System/currentTimeMillis) @player-last-move-time)
-           player-move-interval))
+            (- (System/currentTimeMillis) @player-last-move-time)
+            player-move-interval))
+    ;; We don't want the playfield to be updated while we are moving.
+    (reset! mv/update-interval (future (Thread/sleep 100) (inc 0)))
     (swap! player-last-move-time (fn [x] (System/currentTimeMillis)))
     (mv/move-right! MATRIX ACTIVE-PIECE)))
 
@@ -169,6 +173,8 @@
 (defn key-down
   "Contract: nil -> nil"
   []
+  ;; We don't want the playfield to be updated while we are pressing keys.
+  (reset! mv/update-interval (future (Thread/sleep 100) (inc 0)))
   (let [user-input (gui/get-key)]
     (cond
       (= KeyEvent/VK_LEFT user-input) (reset! is-left-pressed? true)
@@ -182,6 +188,7 @@
 (defn key-up
   "Contract: nil -> nil"
   []
+  (reset! mv/update-interval nil)
   (let [user-input (gui/get-key)]
     (cond
       (= KeyEvent/VK_LEFT user-input) (reset! is-left-pressed? false)
