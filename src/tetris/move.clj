@@ -32,6 +32,10 @@
             [tetris.matrix :as m]
             [tetris.collision :as c]))
 
+;; This can be either nil or a waiting future like this (future (Thread/sleep 500) (inc 0)).
+;; The point is to give the player some time to think before his piece is dropped and the playfield is updated.
+(def update-interval (atom nil))
+
 ;; All possible tetris pieces and their spawning locations.
 (def START-POSITIONS
   {"I" [0 3]
@@ -58,9 +62,13 @@
   "Contract: atom atom -> nil
   Note: Both arguments are atoms that will be swapped."
   [playfield active-piece]
-  (swap! playfield
-         #(m/insert-piece (:graphics @active-piece) % (:row @active-piece) (:col @active-piece)))
-  (swap! active-piece #(assoc % :anchored true)))
+  (cond
+    (nil? @update-interval) (reset! update-interval (future (Thread/sleep 100) (inc 0)))
+    (future-done? @update-interval)
+    (do (swap! playfield
+               #(m/insert-piece (:graphics @active-piece) % (:row @active-piece) (:col @active-piece)))
+        (swap! active-piece #(assoc % :anchored true))
+        (reset! update-interval nil))))
 
 (defn move-active-piece!
   "Contract: atom atom int int -> nil or error keyword"
@@ -121,4 +129,7 @@
   [playfield active-piece]
   (let [lowest-row (get-lowest-row @playfield (:graphics @active-piece) (:row @active-piece) (:col @active-piece))]
     (move-active-piece! playfield active-piece :x lowest-row :y (:col @active-piece))
-    (update-playfield! playfield active-piece)))
+    ;; Update the playfield immediately.
+    (swap! playfield
+           #(m/insert-piece (:graphics @active-piece) % (:row @active-piece) (:col @active-piece)))
+    (swap! active-piece #(assoc % :anchored true))))
