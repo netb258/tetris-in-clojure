@@ -14,7 +14,7 @@
   (q/frame-rate FPS)
   (q/stroke 0)
   (q/stroke-weight 0)
-  (q/background 255 255 255))
+  (q/background 40 40 40))
 
 (defn get-color
   [ch]
@@ -26,8 +26,8 @@
     (or (= \m ch) (= \M ch)) (q/fill 219 48 130)
     (or (= \c ch) (= \C ch)) (q/fill 27 161 266)
     (or (= \o ch) (= \O ch)) (q/fill 255 129 0)
-    (= \= ch) (q/fill 220 220 220)
-    :else (q/fill 255 255 255)))
+    (= \= ch) (q/fill 150 150 150)
+    :else (q/fill 40 40 40)))
 
 (defn print-line!
   [text lnum use-color]
@@ -65,10 +65,10 @@
   (q/text "AROW KEYS: MOVE" 0 140)
   (q/text "PRESS Z: ROTATE L" 0 160)
   (q/text "PRESS X: ROTATE R" 0 180)
-  (q/text (str "*SCORE: " score) 0 230)
-  (q/text (str "*LINES: " lines) 0 250)
-  (q/text (str "HIGH SCORE: " high-score) 0 270)
-  (q/text (str "HIGH LINES: " high-lines) 0 290))
+  (q/text (str "*LINES: " lines) 0 230)
+  (q/text (str "*SCORE: " score) 0 250)
+  (q/text (str "HIGH LINES: " high-lines) 0 270)
+  (q/text (str "HIGH SCORE: " high-score) 0 290))
 
 (defn show-game-over-screen! [score lines high-score high-lines]
   (q/background 0 0 0)
@@ -79,7 +79,7 @@
   (q/text "GAME OVER" (/ WINDOW-WIDTH 2) 50)
   (q/text-size 15)
   (q/text-align :left)
-  (q/text (str "YOUR SCORE: " score) 0 90)
-  (q/text (str "YOUR LINES: " lines) 0 120)
-  (q/text (str "HIGH SCORE: " high-score) 0 150)
-  (q/text (str "HIGH LINES: " high-lines) 0 180))
+  (q/text (str "YOUR LINES: " lines) 0 90)
+  (q/text (str "YOUR SCORE: " score) 0 120)
+  (q/text (str "HIGH LINES: " high-lines) 0 150)
+  (q/text (str "HIGH SCORE: " high-score) 0 180))
