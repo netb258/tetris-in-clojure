@@ -63,7 +63,7 @@
   Note: Both arguments are atoms that will be swapped."
   [playfield active-piece]
   (cond
-    (nil? @update-interval) (reset! update-interval (future (Thread/sleep 100) (inc 0)))
+    (nil? @update-interval) (reset! update-interval (future (Thread/sleep 500) (inc 0)))
     (future-done? @update-interval)
     (do (swap! playfield
                #(m/insert-piece (:graphics @active-piece) % (:row @active-piece) (:col @active-piece)))
