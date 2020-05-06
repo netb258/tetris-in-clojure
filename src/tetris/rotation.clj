@@ -44,7 +44,6 @@
         new-rotation (g/get-graphics current-id rotation)]
     (cond
       ;; We con't rotate if we are at the bottom of the playfield.
-      (= :top-collison (c/check-bounds current-row current-col new-rotation @playfield)) :cant-rotate
       (= :bottom-collison (c/check-bounds current-row current-col new-rotation @playfield)) :cant-rotate
       (= :side-collison (c/check-bounds current-row current-col new-rotation @playfield))
       (when (not= :cant-move-there (mv/move-left! playfield active-piece)) (recur playfield active-piece rotation))
