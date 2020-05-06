@@ -176,16 +176,22 @@
       (= KeyEvent/VK_DOWN user-input) (mv/move-down! MATRIX ACTIVE-PIECE)
       (= KeyEvent/VK_UP user-input) (mv/hard-drop! MATRIX ACTIVE-PIECE)
       (= \newline user-input) (swap! GAME-RUNNING? not)
-      (= \z user-input) (r/rotate-left! MATRIX ACTIVE-PIECE)
-      (= \x user-input) (r/rotate-right! MATRIX ACTIVE-PIECE))))
+      ;; NOTE: The playfield cannot finilize while the player is rotating.
+      (= \z user-input) (do (r/rotate-left! MATRIX ACTIVE-PIECE)
+                            (reset! mv/update-interval (future (Thread/sleep 500) (inc 0))))
+      (= \x user-input) (do (r/rotate-right! MATRIX ACTIVE-PIECE)
+                            (reset! mv/update-interval (future (Thread/sleep 500) (inc 0)))))))
 
 (defn key-up
   "Contract: nil -> nil"
   []
   (let [user-input (gui/get-key)]
     (cond
-      (= KeyEvent/VK_LEFT user-input) (reset! is-left-pressed? false)
-      (= KeyEvent/VK_RIGHT user-input) (reset! is-right-pressed? false))))
+      ;; NOTE: If the player has stopped rotating, then we can update the playfield.
+      (= \z user-input) (reset! mv/update-interval nil)
+      (= \x user-input) (reset! mv/update-interval nil)
+      (= KeyEvent/VK_LEFT user-input) (do (reset! is-left-pressed? false) (reset! mv/update-interval nil))
+      (= KeyEvent/VK_RIGHT user-input) (do (reset! is-right-pressed? false) (reset! mv/update-interval nil)))))
 
 (defn show-next-piece!
   "Contract: nil -> nil
