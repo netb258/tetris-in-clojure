@@ -112,6 +112,17 @@
       (= :collision (c/detect-collision new-x new-y (:graphics @active-piece) @playfield)) (update-playfield! playfield active-piece)
       :else (move-active-piece! playfield active-piece :x new-x :y new-y))))
 
+(defn move-up!
+  "Contract: atom atom -> nil or error keyword
+  Moves to move the current active tetris piece one step up."
+  [playfield active-piece]
+  (let [new-x (dec (:row @active-piece))
+        new-y (:col @active-piece)]
+    (cond
+      (not= :in-bounds (c/check-bounds new-x new-y (:graphics @active-piece) @playfield)) (update-playfield! playfield active-piece)
+      (= :collision (c/detect-collision new-x new-y (:graphics @active-piece) @playfield)) (update-playfield! playfield active-piece)
+      :else (move-active-piece! playfield active-piece :x new-x :y new-y))))
+
 (defn get-lowest-row
   "Contract: vector<vector> int int -> int
   Returns the lowest row that a piece can drop in the matrix."
