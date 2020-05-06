@@ -34,7 +34,7 @@
 
 (defn rotate-piece!
   "Contract: atom atom keyword -> nil
-  NOTE: There is only one situation when the rotation would put us out of bounds:
+  NOTE: There is only one situation when the rotation would cause a side collision:
   When we have moved too far to the right and we are trying to rotate out of the matrix (can't happen for left).
   We correct this situation by moving ot the left, until (not= :in-bounds) becomes false (or we :cant-move-there)."
   [playfield active-piece rotation]
@@ -44,9 +44,12 @@
         new-rotation (g/get-graphics current-id rotation)]
     (cond
       ;; We con't rotate if we are at the bottom of the playfield.
+      (= :top-collison (c/check-bounds current-row current-col new-rotation @playfield)) :cant-rotate
       (= :bottom-collison (c/check-bounds current-row current-col new-rotation @playfield)) :cant-rotate
-      (not= :in-bounds (c/check-bounds current-row current-col new-rotation @playfield))
+      (= :side-collison (c/check-bounds current-row current-col new-rotation @playfield))
       (when (not= :cant-move-there (mv/move-left! playfield active-piece)) (recur playfield active-piece rotation))
+      (not= :no-collision (c/detect-collision current-row current-col new-rotation @playfield))
+      (when (> (:row @active-piece) 0) (mv/move-up! playfield active-piece) (recur playfield active-piece rotation))
       (= :no-collision (c/detect-collision current-row current-col new-rotation @playfield))
       (swap!
         active-piece
