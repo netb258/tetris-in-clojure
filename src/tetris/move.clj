@@ -119,8 +119,8 @@
   (let [new-x (dec (:row @active-piece))
         new-y (:col @active-piece)]
     (cond
-      (not= :in-bounds (c/check-bounds new-x new-y (:graphics @active-piece) @playfield)) (update-playfield! playfield active-piece)
-      (= :collision (c/detect-collision new-x new-y (:graphics @active-piece) @playfield)) (update-playfield! playfield active-piece)
+      (not= :in-bounds (c/check-bounds new-x new-y (:graphics @active-piece) @playfield)) :out-of-bouns
+      (= :collision (c/detect-collision new-x new-y (:graphics @active-piece) @playfield)) :cant-move-there
       :else (move-active-piece! playfield active-piece :x new-x :y new-y))))
 
 (defn get-lowest-row
