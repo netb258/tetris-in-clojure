@@ -60,7 +60,8 @@
 
 (defn get-game-speed "Contract: nil -> int" []
   (cond
-    (> @CLEARED-LINES 120) 60
+    (> @CLEARED-LINES 150) 50
+    (> @CLEARED-LINES 125) 60
     (> @CLEARED-LINES 100) 65
     (> @CLEARED-LINES 75) 80
     (> @CLEARED-LINES 60) 120
