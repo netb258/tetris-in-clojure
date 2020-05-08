@@ -48,7 +48,8 @@
       (= :side-collison (c/check-bounds current-row current-col new-rotation @playfield))
       (when (not= :cant-move-there (mv/move-left! playfield active-piece)) (recur playfield active-piece rotation))
       (not= :no-collision (c/detect-collision current-row current-col new-rotation @playfield))
-      (when (> (:row @active-piece) 0) (mv/move-up! playfield active-piece) (recur playfield active-piece rotation))
+      (when (and (> (:row @active-piece) 0) (not= :cant-move-there (mv/move-up! playfield active-piece)))
+        (recur playfield active-piece rotation))
       (= :no-collision (c/detect-collision current-row current-col new-rotation @playfield))
       (swap!
         active-piece
