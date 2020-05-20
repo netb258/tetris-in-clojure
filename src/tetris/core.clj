@@ -60,15 +60,13 @@
 
 (defn get-game-speed "Contract: nil -> int" []
   (cond
-    (> @CLEARED-LINES 150) 50
-    (> @CLEARED-LINES 125) 60
-    (> @CLEARED-LINES 100) 65
-    (> @CLEARED-LINES 75) 80
-    (> @CLEARED-LINES 60) 120
-    (> @CLEARED-LINES 40) 250
-    (> @CLEARED-LINES 30) 330
-    (> @CLEARED-LINES 20) 400
-    (> @CLEARED-LINES 10) 500
+    (> @CLEARED-LINES 100) 30
+    (> @CLEARED-LINES 75) 50
+    (> @CLEARED-LINES 60) 75
+    (> @CLEARED-LINES 40) 100
+    (> @CLEARED-LINES 30) 200
+    (> @CLEARED-LINES 20) 300
+    (> @CLEARED-LINES 10) 400
     :else 600))
 
 (defn choose-new-piece!
